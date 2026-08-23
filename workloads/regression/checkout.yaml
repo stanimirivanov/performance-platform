@@ -1,0 +1,15 @@
+duration: 15m
+arrivalRate: 50
+maxVUs: 100
+
+stages:
+  - duration: 2m
+    target: 50
+  - duration: 10m
+    target: 50
+  - duration: 3m
+    target: 0
+
+thresholds:
+  checkout_duration: ['p(95)<400', 'p(99)<800']
+  http_req_failed: ['rate<0.005']

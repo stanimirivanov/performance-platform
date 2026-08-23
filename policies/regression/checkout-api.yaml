@@ -1,0 +1,27 @@
+apiVersion: performance.platform.io/v1
+kind: RegressionPolicy
+
+metadata:
+  name: checkout-api
+  version: '1.0'
+  owner: payments-team
+
+spec:
+  metrics:
+    checkout_duration:
+      direction: lower-is-better
+      practicalDifference: 0.10
+      description: Checkout transaction duration
+      baseline: approved-checkout-duration
+
+    checkout_throughput:
+      direction: higher-is-better
+      practicalDifference: 0.05
+      description: Checkout throughput
+      baseline: approved-checkout-throughput
+
+    checkout_error_rate:
+      direction: lower-is-better
+      practicalDifference: 0.02
+      description: Checkout error rate
+      baseline: approved-checkout-error-rate

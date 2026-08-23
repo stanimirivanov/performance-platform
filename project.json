@@ -1,0 +1,35 @@
+{
+  "name": "k6-tests",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "tests/k6",
+  "targets": {
+    "smoke": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "k6 run --config ../../workloads/smoke/checkout.yaml checkout/scenario.js",
+        "cwd": "tests/k6"
+      }
+    },
+    "regression": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "k6 run --config ../../workloads/regression/checkout.yaml checkout/scenario.js",
+        "cwd": "tests/k6"
+      }
+    },
+    "stress": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "k6 run --config ../../workloads/stress/checkout.yaml checkout/scenario.js",
+        "cwd": "tests/k6"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "echo 'No linting for k6 tests'"
+      }
+    }
+  }
+}
