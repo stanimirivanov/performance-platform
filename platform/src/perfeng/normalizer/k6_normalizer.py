@@ -98,6 +98,9 @@ class K6Normalizer:
         # Determine direction
         direction = self._determine_direction(metric_name, metric_type)
 
+        # Get sample count from values (not top level)
+        sample_count = values.get("count", 0)
+
         # Build normalized result
         result: dict[str, Any] = {
             "schemaVersion": 1,
@@ -109,15 +112,16 @@ class K6Normalizer:
                 "unit": self._determine_unit(metric_name, metric_type),
             },
             "distribution": {
-                "samples": metric_data.get("count", 0),
+                "samples": sample_count,
             },
         }
 
         # Add distribution values
-        if "mean" in values:
-            result["distribution"]["mean"] = values["mean"]
-        if "median" in values:
-            result["distribution"]["median"] = values["median"]
+        # k6 uses "avg" and "med" instead of "mean" and "median"
+        if "avg" in values:
+            result["distribution"]["mean"] = values["avg"]
+        if "med" in values:
+            result["distribution"]["median"] = values["med"]
         if "p(90)" in values:
             result["distribution"]["p90"] = values["p(90)"]
         if "p(95)" in values:
@@ -132,8 +136,10 @@ class K6Normalizer:
             result["distribution"]["max"] = values["max"]
 
         # Calculate CV if mean and stddev available
-        if "mean" in values and "stddev" in values and values["mean"] > 0:
-            result["distribution"]["cv"] = values["stddev"] / values["mean"]
+        mean = values.get("avg", values.get("mean", 0))
+        stddev = values.get("stddev", 0)
+        if mean and stddev and mean > 0:
+            result["distribution"]["cv"] = stddev / mean
 
         # Add threshold results if available
         if "thresholds" in metric_data:
