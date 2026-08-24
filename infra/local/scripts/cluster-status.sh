@@ -26,7 +26,7 @@ kubectl get nodes --show-labels
 
 echo ""
 echo "=== Node Taints ==="
-kubectl get nodes -o custom-columns=NAME:.metadata.name,TAINTS:.spec.taints
+kubectl describe nodes | grep -E "^(Name|Taints):"
 
 echo ""
 echo "=== Pods (all namespaces) ==="
@@ -34,8 +34,18 @@ kubectl get pods --all-namespaces -o wide
 
 echo ""
 echo "=== Resource Usage ==="
-kubectl top nodes 2>/dev/null || echo "metrics-server not installed yet"
+if kubectl top nodes 2>/dev/null; then
+    :
+else
+    echo "metrics-server not installed yet"
+fi
 
 echo ""
 echo "=== Kubernetes Version ==="
-kubectl version --short
+# Client version
+CLIENT_VERSION=$(kubectl version --client -o json 2>/dev/null | python3 -c "import sys, json; print(json.load(sys.stdin)['gitVersion'])" 2>/dev/null || echo "unknown")
+echo "Client Version: ${CLIENT_VERSION}"
+
+# Server version (direct API call)
+SERVER_VERSION=$(kubectl get --raw /version 2>/dev/null | python3 -c "import sys, json; print(json.load(sys.stdin)['gitVersion'])" 2>/dev/null || echo "unknown")
+echo "Server Version: ${SERVER_VERSION}"

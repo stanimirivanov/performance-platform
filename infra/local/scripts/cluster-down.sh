@@ -14,6 +14,7 @@ if ! kind get clusters 2>/dev/null | grep -q "^${CLUSTER_NAME}$"; then
 fi
 
 # Delete cluster
+echo "Deleting cluster '${CLUSTER_NAME}'..."
 kind delete cluster --name "${CLUSTER_NAME}"
 
 echo ""

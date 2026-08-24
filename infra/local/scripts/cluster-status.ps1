@@ -57,8 +57,7 @@ kubectl get nodes --show-labels
 
 Write-Host ""
 Write-Host "=== Node Taints ===" -ForegroundColor Cyan
-kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.taints}{"\n"}{end}'
-Write-Host ""
+kubectl describe nodes | Select-String "Name:|Taints:"
 
 Write-Host ""
 Write-Host "=== Pods (all namespaces) ===" -ForegroundColor Cyan
@@ -81,21 +80,15 @@ catch {
 
 Write-Host ""
 Write-Host "=== Kubernetes Version ===" -ForegroundColor Cyan
-try {
-    $versionJson = kubectl version -o json 2>$null
-    if ($versionJson) {
-        $versionObj = $versionJson | ConvertFrom-Json
-        Write-Host "Client Version: $($versionObj.clientVersion.gitVersion)"
-        if ($versionObj.serverVersion) {
-            Write-Host "Server Version: $($versionObj.serverVersion.gitVersion)"
-        }
-    }
-    else {
-        # Fallback
-        kubectl version
-    }
+# Client version
+$clientVersion = kubectl version --client -o json 2>$null | ConvertFrom-Json
+if ($clientVersion) {
+    Write-Host "Client Version: $($clientVersion.gitVersion)"
 }
-catch {
-    # Last resort
-    kubectl version
+
+# Server version (using direct API call to avoid skew warning)
+$serverVersionRaw = kubectl get --raw /version 2>$null
+if ($serverVersionRaw) {
+    $serverVersionObj = $serverVersionRaw | ConvertFrom-Json
+    Write-Host "Server Version: $($serverVersionObj.gitVersion)"
 }

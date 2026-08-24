@@ -26,6 +26,25 @@ function Invoke-KindCommand {
     }
 }
 
+# Helper function to run kubectl commands without stderr errors
+function Invoke-KubectlCommand {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments
+    )
+    
+    $argString = $Arguments -join " "
+    $command = "kubectl $argString 2>&1"
+    
+    $output = cmd /c $command
+    $exitCode = $LASTEXITCODE
+    
+    return @{
+        Output   = $output
+        ExitCode = $exitCode
+    }
+}
+
 # Check 1: Cluster exists
 Write-Host ""
 Write-Host "Checking cluster existence..." -ForegroundColor Yellow
@@ -58,9 +77,11 @@ else {
 Write-Host ""
 Write-Host "Checking node readiness..." -ForegroundColor Yellow
 
-$nodes = kubectl get nodes --no-headers 2>$null
-if ($nodes) {
-    $nodeLines = @($nodes -split "`n" | Where-Object { $_.Trim() -ne "" })
+$nodeResult = Invoke-KubectlCommand -Arguments @("get", "nodes", "--no-headers")
+$nodes = $nodeResult.Output
+
+if ($nodes -and $nodeResult.ExitCode -eq 0) {
+    $nodeLines = @($nodes | Where-Object { $_.Trim() -ne "" })
     $totalNodes = $nodeLines.Count
     $readyNodes = @($nodeLines | Where-Object { $_ -match " Ready " }).Count
     Write-Host "Ready nodes: $readyNodes/$totalNodes"
@@ -82,8 +103,10 @@ else {
 Write-Host ""
 Write-Host "Checking node labels..." -ForegroundColor Yellow
 
-$generatorNodes = kubectl get nodes -l workload=performance-generator --no-headers 2>$null
-if ($generatorNodes) {
+$generatorResult = Invoke-KubectlCommand -Arguments @("get", "nodes", "-l", "workload=performance-generator", "--no-headers")
+$generatorNodes = $generatorResult.Output
+
+if ($generatorNodes -and $generatorResult.ExitCode -eq 0) {
     Write-Host "[OK] Generator node label present" -ForegroundColor Green
 }
 else {
@@ -91,8 +114,10 @@ else {
     $Failed = 1
 }
 
-$sutNodes = kubectl get nodes -l workload=sut --no-headers 2>$null
-if ($sutNodes) {
+$sutResult = Invoke-KubectlCommand -Arguments @("get", "nodes", "-l", "workload=sut", "--no-headers")
+$sutNodes = $sutResult.Output
+
+if ($sutNodes -and $sutResult.ExitCode -eq 0) {
     Write-Host "[OK] SUT node label present" -ForegroundColor Green
 }
 else {
@@ -104,8 +129,10 @@ else {
 Write-Host ""
 Write-Host "Checking control plane..." -ForegroundColor Yellow
 
-$controlPlane = kubectl get nodes -l node-role.kubernetes.io/control-plane --no-headers 2>$null
-if ($controlPlane -match " Ready ") {
+$controlPlaneResult = Invoke-KubectlCommand -Arguments @("get", "nodes", "-l", "node-role.kubernetes.io/control-plane", "--no-headers")
+$controlPlane = $controlPlaneResult.Output
+
+if ($controlPlane -match " Ready " -and $controlPlaneResult.ExitCode -eq 0) {
     Write-Host "[OK] Control plane is ready" -ForegroundColor Green
 }
 else {
@@ -117,8 +144,10 @@ else {
 Write-Host ""
 Write-Host "Checking CoreDNS..." -ForegroundColor Yellow
 
-$coredns = kubectl get pods -n kube-system -l k8s-app=kube-dns --no-headers 2>$null
-if ($coredns -match "Running") {
+$corednsResult = Invoke-KubectlCommand -Arguments @("get", "pods", "-n", "kube-system", "-l", "k8s-app=kube-dns", "--no-headers")
+$coredns = $corednsResult.Output
+
+if ($coredns -match "Running" -and $corednsResult.ExitCode -eq 0) {
     Write-Host "[OK] CoreDNS is running" -ForegroundColor Green
 }
 else {
@@ -130,8 +159,10 @@ else {
 Write-Host ""
 Write-Host "Checking API server..." -ForegroundColor Yellow
 
-$healthz = kubectl get --raw /healthz 2>$null
-if ($healthz -eq "ok") {
+$healthzResult = Invoke-KubectlCommand -Arguments @("get", "--raw", "/healthz")
+$healthz = $healthzResult.Output
+
+if ($healthz -eq "ok" -and $healthzResult.ExitCode -eq 0) {
     Write-Host "[OK] API server is healthy" -ForegroundColor Green
 }
 else {
@@ -143,8 +174,10 @@ else {
 Write-Host ""
 Write-Host "Checking metrics-server..." -ForegroundColor Yellow
 
-$metricsServer = kubectl get pods -n kube-system -l k8s-app=metrics-server --no-headers 2>$null
-if ($metricsServer -match "Running") {
+$metricsResult = Invoke-KubectlCommand -Arguments @("get", "pods", "-n", "kube-system", "-l", "k8s-app=metrics-server", "--no-headers")
+$metricsServer = $metricsResult.Output
+
+if ($metricsServer -match "Running" -and $metricsResult.ExitCode -eq 0) {
     Write-Host "[OK] metrics-server is running" -ForegroundColor Green
 }
 else {
