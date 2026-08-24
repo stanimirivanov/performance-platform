@@ -17,15 +17,34 @@ if (-not (Get-Command kind -ErrorAction SilentlyContinue)) {
 # Check if Docker is running
 try {
     docker info | Out-Null
-} catch {
+}
+catch {
     Write-Error "Docker is not running"
     exit 1
 }
 
-# Check if cluster already exists
-$existingClusters = kind get clusters 2>$null
+# Check if cluster already exists - capture output without error
+$existingClusters = @()
+try {
+    $kindOutput = kind get clusters 2>&1
+    if ($kindOutput -is [string]) {
+        $existingClusters = @($kindOutput -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
+    }
+    elseif ($kindOutput -is [array]) {
+        $existingClusters = @($kindOutput | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ -ne "" })
+    }
+}
+catch {
+    # Ignore errors - just means no clusters
+    $existingClusters = @()
+}
+
+# Filter out the "No kind clusters found." message
+$existingClusters = $existingClusters | Where-Object { $_ -ne "No kind clusters found." -and $_ -notmatch "^No kind" }
+
 if ($existingClusters -contains $ClusterName) {
     Write-Host "Cluster '$ClusterName' already exists" -ForegroundColor Yellow
+    Write-Host "Use 'make cluster-down' to delete it first" -ForegroundColor Yellow
     exit 0
 }
 
@@ -44,3 +63,6 @@ kubectl wait --for=condition=Ready nodes --all --timeout=300s
 Write-Host ""
 Write-Host "Cluster nodes:" -ForegroundColor Cyan
 kubectl get nodes -o wide
+
+Write-Host ""
+Write-Host "Cluster setup complete!" -ForegroundColor Green
