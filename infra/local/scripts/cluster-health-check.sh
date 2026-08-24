@@ -1,80 +1,155 @@
-#!/bin/bash
-set -euo pipefail
+$ErrorActionPreference = "Stop"
 
-CLUSTER_NAME="perfeng-local"
-FAILED=0
+$ClusterName = "perfeng-local"
+$Failed = 0
 
-echo "========================================="
-echo "PerfEng Cluster Health Check"
-echo "========================================="
+Write-Host "=========================================" -ForegroundColor Cyan
+Write-Host "PerfEng Cluster Health Check" -ForegroundColor Cyan
+Write-Host "=========================================" -ForegroundColor Cyan
+
+# Helper function to run kind commands using cmd /c
+function Invoke-KindCommand {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string[]]$Arguments
+    )
+    
+    $argString = $Arguments -join " "
+    $command = "kind $argString 2>&1"
+    
+    $output = cmd /c $command
+    $exitCode = $LASTEXITCODE
+    
+    return @{
+        Output = $output
+        ExitCode = $exitCode
+    }
+}
 
 # Check 1: Cluster exists
-echo "Checking cluster existence..."
-if kind get clusters 2>/dev/null | grep -q "^${CLUSTER_NAME}$"; then
-    echo "✓ Cluster '${CLUSTER_NAME}' exists"
-else
-    echo "✗ Cluster '${CLUSTER_NAME}' does not exist"
-    FAILED=1
-fi
+Write-Host ""
+Write-Host "Checking cluster existence..." -ForegroundColor Yellow
+
+$existingClusters = @()
+$kindResult = Invoke-KindCommand -Arguments @("get", "clusters")
+$kindOutput = $kindResult.Output
+
+if ($kindOutput) {
+    foreach ($line in $kindOutput) {
+        $trimmed = $line.Trim()
+        if ($trimmed -ne "" -and $trimmed -ne "No kind clusters found." -and $trimmed -notmatch "^No kind") {
+            $existingClusters += $trimmed
+        }
+    }
+}
+
+if ($existingClusters -contains $ClusterName) {
+    Write-Host "[OK] Cluster '$ClusterName' exists" -ForegroundColor Green
+} else {
+    Write-Host "[FAIL] Cluster '$ClusterName' does not exist" -ForegroundColor Red
+    $Failed = 1
+    Write-Host ""
+    Write-Host "Cluster health check failed!" -ForegroundColor Red
+    exit $Failed
+}
 
 # Check 2: All nodes ready
-echo "Checking node readiness..."
-READY_NODES=$(kubectl get nodes --no-headers 2>/dev/null | grep -c " Ready " || echo "0")
-TOTAL_NODES=$(kubectl get nodes --no-headers 2>/dev/null | wc -l || echo "0")
-echo "Ready nodes: ${READY_NODES}/${TOTAL_NODES}"
-if [ "${READY_NODES}" -lt "${TOTAL_NODES}" ]; then
-    echo "✗ Not all nodes are ready"
-    FAILED=1
-fi
+Write-Host ""
+Write-Host "Checking node readiness..." -ForegroundColor Yellow
+
+$nodes = kubectl get nodes --no-headers 2>$null
+if ($nodes) {
+    $nodeLines = @($nodes -split "`n" | Where-Object { $_.Trim() -ne "" })
+    $totalNodes = $nodeLines.Count
+    $readyNodes = @($nodeLines | Where-Object { $_ -match " Ready " }).Count
+    Write-Host "Ready nodes: $readyNodes/$totalNodes"
+    
+    if ($readyNodes -lt $totalNodes) {
+        Write-Host "[FAIL] Not all nodes are ready" -ForegroundColor Red
+        $Failed = 1
+    } else {
+        Write-Host "[OK] All nodes are ready" -ForegroundColor Green
+    }
+} else {
+    Write-Host "[FAIL] Cannot get node list" -ForegroundColor Red
+    $Failed = 1
+}
 
 # Check 3: Node labels present
-echo "Checking node labels..."
-if kubectl get nodes -l workload=performance-generator --no-headers 2>/dev/null | grep -q .; then
-    echo "✓ Generator node label present"
-else
-    echo "✗ Generator node label missing"
-    FAILED=1
-fi
+Write-Host ""
+Write-Host "Checking node labels..." -ForegroundColor Yellow
 
-if kubectl get nodes -l workload=sut --no-headers 2>/dev/null | grep -q .; then
-    echo "✓ SUT node label present"
-else
-    echo "✗ SUT node label missing"
-    FAILED=1
-fi
+$generatorNodes = kubectl get nodes -l workload=performance-generator --no-headers 2>$null
+if ($generatorNodes) {
+    Write-Host "[OK] Generator node label present" -ForegroundColor Green
+} else {
+    Write-Host "[FAIL] Generator node label missing" -ForegroundColor Red
+    $Failed = 1
+}
+
+$sutNodes = kubectl get nodes -l workload=sut --no-headers 2>$null
+if ($sutNodes) {
+    Write-Host "[OK] SUT node label present" -ForegroundColor Green
+} else {
+    Write-Host "[FAIL] SUT node label missing" -ForegroundColor Red
+    $Failed = 1
+}
 
 # Check 4: Control plane ready
-echo "Checking control plane..."
-if kubectl get nodes -l node-role.kubernetes.io/control-plane --no-headers 2>/dev/null | grep -q " Ready "; then
-    echo "✓ Control plane is ready"
-else
-    echo "✗ Control plane not ready"
-    FAILED=1
-fi
+Write-Host ""
+Write-Host "Checking control plane..." -ForegroundColor Yellow
+
+$controlPlane = kubectl get nodes -l node-role.kubernetes.io/control-plane --no-headers 2>$null
+if ($controlPlane -match " Ready ") {
+    Write-Host "[OK] Control plane is ready" -ForegroundColor Green
+} else {
+    Write-Host "[FAIL] Control plane not ready" -ForegroundColor Red
+    $Failed = 1
+}
 
 # Check 5: CoreDNS running
-echo "Checking CoreDNS..."
-if kubectl get pods -n kube-system -l k8s-app=kube-dns --no-headers 2>/dev/null | grep -q "Running"; then
-    echo "✓ CoreDNS is running"
-else
-    echo "✗ CoreDNS not running"
-    FAILED=1
-fi
+Write-Host ""
+Write-Host "Checking CoreDNS..." -ForegroundColor Yellow
+
+$coredns = kubectl get pods -n kube-system -l k8s-app=kube-dns --no-headers 2>$null
+if ($coredns -match "Running") {
+    Write-Host "[OK] CoreDNS is running" -ForegroundColor Green
+} else {
+    Write-Host "[FAIL] CoreDNS not running" -ForegroundColor Red
+    $Failed = 1
+}
 
 # Check 6: API server accessible
-echo "Checking API server..."
-if kubectl get --raw /healthz &>/dev/null; then
-    echo "✓ API server is healthy"
-else
-    echo "✗ API server not accessible"
-    FAILED=1
-fi
+Write-Host ""
+Write-Host "Checking API server..." -ForegroundColor Yellow
 
-echo ""
-if [ "${FAILED}" -eq 0 ]; then
-    echo "✓ All health checks passed!"
-else
-    echo "✗ Some health checks failed"
-fi
+$healthz = kubectl get --raw /healthz 2>$null
+if ($healthz -eq "ok") {
+    Write-Host "[OK] API server is healthy" -ForegroundColor Green
+} else {
+    Write-Host "[FAIL] API server not accessible" -ForegroundColor Red
+    $Failed = 1
+}
 
-exit ${FAILED}
+# Check 7: Metrics server (if installed)
+Write-Host ""
+Write-Host "Checking metrics-server..." -ForegroundColor Yellow
+
+$metricsServer = kubectl get pods -n kube-system -l k8s-app=metrics-server --no-headers 2>$null
+if ($metricsServer -match "Running") {
+    Write-Host "[OK] metrics-server is running" -ForegroundColor Green
+} else {
+    Write-Host "[WARN] metrics-server not installed (optional)" -ForegroundColor Yellow
+}
+
+# Summary
+Write-Host ""
+Write-Host "=========================================" -ForegroundColor Cyan
+if ($Failed -eq 0) {
+    Write-Host "All health checks passed!" -ForegroundColor Green
+} else {
+    Write-Host "Some health checks failed" -ForegroundColor Red
+}
+Write-Host "=========================================" -ForegroundColor Cyan
+
+exit $Failed
