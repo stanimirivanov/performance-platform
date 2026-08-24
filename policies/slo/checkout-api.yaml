@@ -1,0 +1,26 @@
+apiVersion: performance.platform.io/v1
+kind: SLO
+
+metadata:
+  name: checkout-api
+  version: '1.0'
+  owner: payments-team
+  description: SLOs for checkout API endpoints
+
+spec:
+  metrics:
+    checkout_duration_p95:
+      max: 500ms
+      description: Checkout transaction duration (p95)
+
+    checkout_duration_p99:
+      max: 1000ms
+      description: Checkout transaction duration (p99)
+
+    checkout_error_rate:
+      max: 0.01
+      description: Checkout failure rate
+
+    checkout_throughput:
+      min: 50
+      description: Minimum sustainable throughput (req/s)

@@ -1,0 +1,11 @@
+{
+  "name": "@perfeng/k6-tests",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "test": "k6 run",
+    "smoke": "k6 run --config ../../workloads/smoke/checkout.json checkout/scenario.js",
+    "regression": "k6 run --config ../../workloads/regression/checkout.json checkout/scenario.js",
+    "stress": "k6 run --config ../../workloads/stress/checkout.yaml checkout/scenario.js"
+  }
+}
