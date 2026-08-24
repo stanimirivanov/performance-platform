@@ -1,10 +1,11 @@
 {
-  "$schema": "http://json-schema.org/draft/2020-12/schema",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://perfeng.dev/schemas/test-result.schema.json",
   "title": "Normalized Test Result",
   "description": "Normalized performance test result independent of tool",
   "type": "object",
   "required": ["schemaVersion", "runId", "metric", "distribution"],
+  "additionalProperties": false,
   "properties": {
     "schemaVersion": {
       "type": "integer",
@@ -19,9 +20,12 @@
     "metric": {
       "type": "object",
       "required": ["name", "direction"],
+      "additionalProperties": false,
       "properties": {
         "name": {
           "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_.]*$",
           "description": "Metric name (e.g., checkout_duration_p95)"
         },
         "direction": {
@@ -43,6 +47,7 @@
     "distribution": {
       "type": "object",
       "required": ["samples"],
+      "additionalProperties": false,
       "properties": {
         "samples": {
           "type": "integer",
@@ -59,18 +64,22 @@
         },
         "p90": {
           "type": "number",
+          "minimum": 0,
           "description": "90th percentile"
         },
         "p95": {
           "type": "number",
+          "minimum": 0,
           "description": "95th percentile"
         },
         "p99": {
           "type": "number",
+          "minimum": 0,
           "description": "99th percentile"
         },
         "stddev": {
           "type": "number",
+          "minimum": 0,
           "description": "Standard deviation"
         },
         "min": {
@@ -83,6 +92,7 @@
         },
         "cv": {
           "type": "number",
+          "minimum": 0,
           "description": "Coefficient of variation"
         }
       }
@@ -90,12 +100,15 @@
     "thresholds": {
       "type": "object",
       "description": "Threshold evaluation results",
+      "additionalProperties": false,
       "properties": {
         "slo": {
           "type": "object",
           "description": "SLO threshold results",
           "additionalProperties": {
             "type": "object",
+            "required": ["passed"],
+            "additionalProperties": false,
             "properties": {
               "passed": {
                 "type": "boolean"
@@ -114,6 +127,8 @@
           "description": "Regression threshold results",
           "additionalProperties": {
             "type": "object",
+            "required": ["passed"],
+            "additionalProperties": false,
             "properties": {
               "passed": {
                 "type": "boolean"

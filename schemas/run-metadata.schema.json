@@ -1,14 +1,16 @@
 {
-  "$schema": "http://json-schema.org/draft/2020-12/schema",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://perfeng.dev/schemas/run-metadata.schema.json",
   "title": "Performance Run Metadata",
   "description": "Complete metadata for a single performance test run",
   "type": "object",
   "required": ["run", "test", "candidate", "environment"],
+  "additionalProperties": false,
   "properties": {
     "run": {
       "type": "object",
-      "required": ["id", "suite", "profile", "timestamp", "trigger"],
+      "required": ["id", "suite", "profile", "timestamp", "trigger", "status"],
+      "additionalProperties": false,
       "properties": {
         "id": {
           "type": "string",
@@ -17,6 +19,7 @@
         },
         "suite": {
           "type": "string",
+          "minLength": 1,
           "description": "Test suite name (e.g., checkout-api, search-flow)"
         },
         "profile": {
@@ -67,6 +70,7 @@
         },
         "notes": {
           "type": "string",
+          "maxLength": 1000,
           "description": "Optional notes about this run"
         }
       }
@@ -74,6 +78,7 @@
     "test": {
       "type": "object",
       "required": ["type", "tool", "toolVersion", "scenario"],
+      "additionalProperties": false,
       "properties": {
         "type": {
           "type": "string",
@@ -87,10 +92,12 @@
         },
         "toolVersion": {
           "type": "string",
+          "minLength": 1,
           "description": "Version of the test tool"
         },
         "scenario": {
           "type": "string",
+          "minLength": 1,
           "description": "Specific scenario name"
         },
         "workloadVersion": {
@@ -106,10 +113,11 @@
     "candidate": {
       "type": "object",
       "required": ["gitSha"],
+      "additionalProperties": false,
       "properties": {
         "gitSha": {
           "type": "string",
-          "pattern": "^[a-f0-9]{40}$",
+          "pattern": "^[A-Fa-f0-9]{40}$",
           "description": "Git commit SHA of the candidate"
         },
         "imageDigest": {
@@ -132,7 +140,7 @@
           "type": "object",
           "description": "Feature flag settings",
           "additionalProperties": {
-            "type": "string"
+            "type": ["string", "boolean", "number", "null"]
           }
         },
         "databaseMigrationVersion": {
@@ -144,13 +152,16 @@
     "environment": {
       "type": "object",
       "required": ["cluster", "kubernetesVersion"],
+      "additionalProperties": false,
       "properties": {
         "cluster": {
           "type": "string",
+          "minLength": 1,
           "description": "Cluster name"
         },
         "kubernetesVersion": {
           "type": "string",
+          "pattern": "^v?\\d+\\.\\d+\\.\\d+",
           "description": "Kubernetes version"
         },
         "nodePool": {
@@ -184,6 +195,7 @@
         },
         "fingerprint": {
           "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
           "description": "Canonical environment fingerprint"
         },
         "nodeCount": {
@@ -200,6 +212,7 @@
     "runtime": {
       "type": "object",
       "description": "Runtime resource configuration",
+      "additionalProperties": false,
       "properties": {
         "replicas": {
           "type": "integer",
@@ -208,35 +221,44 @@
         },
         "cpuRequests": {
           "type": "string",
+          "pattern": "^\\d+(\\.\\d+)?m?$",
           "description": "CPU requests (e.g., '500m')"
         },
         "cpuLimits": {
           "type": "string",
+          "pattern": "^\\d+(\\.\\d+)?m?$",
           "description": "CPU limits"
         },
         "memoryRequests": {
           "type": "string",
+          "pattern": "^\\d+(\\.\\d+)?(Ki|Mi|Gi|Ti|K|M|G|T)?$",
           "description": "Memory requests (e.g., '512Mi')"
         },
         "memoryLimits": {
           "type": "string",
+          "pattern": "^\\d+(\\.\\d+)?(Ki|Mi|Gi|Ti|K|M|G|T)?$",
           "description": "Memory limits"
         },
         "hpa": {
           "type": "object",
           "description": "Horizontal Pod Autoscaler configuration",
+          "additionalProperties": false,
           "properties": {
             "enabled": {
               "type": "boolean"
             },
             "minReplicas": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": 1
             },
             "maxReplicas": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": 1
             },
             "targetCpuUtilization": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
             }
           }
         }
@@ -245,6 +267,7 @@
     "data": {
       "type": "object",
       "description": "Test data information",
+      "additionalProperties": false,
       "properties": {
         "datasetId": {
           "type": "string",
@@ -256,6 +279,7 @@
         },
         "databaseSize": {
           "type": "string",
+          "pattern": "^\\d+(\\.\\d+)?(KB|MB|GB|TB|KiB|MiB|GiB|TiB)$",
           "description": "Database size (e.g., '10GB')"
         },
         "seedVersion": {
@@ -267,6 +291,7 @@
     "phases": {
       "type": "object",
       "description": "Timing information for different phases",
+      "additionalProperties": false,
       "properties": {
         "provisionStart": {
           "type": "string",

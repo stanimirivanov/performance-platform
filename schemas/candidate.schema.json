@@ -1,14 +1,15 @@
 {
-  "$schema": "http://json-schema.org/draft/2020-12/schema",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://perfeng.dev/schemas/candidate.schema.json",
   "title": "Candidate Specification",
   "description": "Candidate software version under test",
   "type": "object",
   "required": ["gitSha"],
+  "additionalProperties": false,
   "properties": {
     "gitSha": {
       "type": "string",
-      "pattern": "^[a-f0-9]{40}$",
+      "pattern": "^[A-Fa-f0-9]{40}$",
       "description": "Git commit SHA"
     },
     "branch": {
@@ -30,7 +31,7 @@
     "featureFlags": {
       "type": "object",
       "additionalProperties": {
-        "type": "string"
+        "type": ["string", "boolean", "number", "null"]
       }
     },
     "databaseMigrationVersion": {

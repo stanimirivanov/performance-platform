@@ -9,10 +9,20 @@ Usage:
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 from typing import Final
 
-from datamodel_code_generator import InputFileType, PythonVersion, generate
+from datamodel_code_generator import InputFileType, generate
+from datamodel_code_generator.enums import DataModelType
+from datamodel_code_generator.format import Formatter
+
+# Suppress FutureWarning from datamodel_code_generator
+warnings.filterwarnings(
+    "ignore",
+    message="The default external formatters",
+    category=FutureWarning,
+)
 
 # Paths
 SCHEMAS_DIR: Final[Path] = Path(__file__).parent.parent.parent / "schemas"
@@ -46,24 +56,22 @@ def generate_models() -> None:
             input_=schema_path,
             input_file_type=InputFileType.JsonSchema,
             output=output_path,
-            output_model_type="pydantic_v2.BaseModel",
-            target_python_version=PythonVersion.PY_311,
+            output_model_type=DataModelType.PydanticV2BaseModel,
             use_standard_collections=True,
             use_union_operator=True,
             field_constraints=True,
             snake_case_field=True,
             strip_default_none=True,
-            apply_default_values_for_required_fields=False,
             use_annotated=True,
             use_field_description=True,
-            collapse_root_models=False,
             use_double_quotes=True,
-            custom_template_dir=None,
-            extra_template_data=None,
+            collapse_root_models=False,
+            formatters=[Formatter.BUILTIN],
         )
 
         print(f"  Generated: {output_path}")
 
+    # Generate __init__.py with correct class names
     print("\nGenerating __init__.py...")
     init_content = '''"""Generated Pydantic models from JSON schemas.
 
@@ -71,12 +79,22 @@ This module is auto-generated. Do not edit manually.
 Run `uv run python scripts/generate_models.py` to regenerate.
 """
 
-from .candidate import Candidate
-from .environment import Environment
-from .run_metadata import RunMetadata
-from .test_result import TestResult
+from .candidate import CandidateSpecification
+from .environment import EnvironmentSpecification
+from .run_metadata import PerformanceRunMetadata
+from .test_result import NormalizedTestResult
+
+# Type aliases for convenience
+Candidate = CandidateSpecification
+Environment = EnvironmentSpecification
+RunMetadata = PerformanceRunMetadata
+TestResult = NormalizedTestResult
 
 __all__ = [
+    "CandidateSpecification",
+    "EnvironmentSpecification",
+    "PerformanceRunMetadata",
+    "NormalizedTestResult",
     "Candidate",
     "Environment",
     "RunMetadata",

@@ -4,15 +4,28 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any, cast
 
-from perfeng.utils.validation import validate_run_metadata, validate_test_result
+from perfeng.generated import RunMetadata
+from perfeng.utils.validation import (
+    validate_pydantic_model,
+    validate_run_metadata,
+    validate_test_result,
+)
 
 
-def load_example(name: str) -> dict:
-    """Load an example JSON file."""
+def load_example(name: str) -> dict[str, Any]:
+    """Load an example JSON file.
+
+    Args:
+        name: Name of the example file.
+
+    Returns:
+        The example data as a dictionary.
+    """
     path = Path(__file__).parent.parent.parent / "examples" / "metadata" / name
     with open(path) as f:
-        return json.load(f)
+        return cast(dict[str, Any], json.load(f))
 
 
 def test_run_metadata_example_valid() -> None:
@@ -31,6 +44,55 @@ def test_test_result_example_valid() -> None:
 
 def test_invalid_run_metadata() -> None:
     """Test that invalid metadata is rejected."""
-    data = {"run": {"id": "invalid"}}
+    data: dict[str, Any] = {"run": {"id": "invalid"}}
     errors = validate_run_metadata(data)
     assert errors
+
+
+def test_pydantic_model_validation() -> None:
+    """Test Pydantic model validation."""
+    data = load_example("run-metadata-example.json")
+    model, errors = validate_pydantic_model(data, RunMetadata)
+    assert model is not None, f"Validation errors: {errors}"
+    assert not errors
+    assert model.run.id == "perf-20240115-143022-ab12cd34"
+
+
+def test_pydantic_model_invalid() -> None:
+    """Test Pydantic model rejects invalid data."""
+    data: dict[str, Any] = {"run": {"id": "invalid"}}
+    model, errors = validate_pydantic_model(data, RunMetadata)
+    assert model is None
+    assert errors
+
+
+def test_pydantic_model_rejects_unexpected_fields() -> None:
+    """Test that Pydantic model rejects unexpected fields."""
+    data = load_example("run-metadata-example.json")
+    # Add an unexpected field
+    data["unexpectedField"] = "should be rejected"
+
+    # JSON Schema validation should catch it
+    errors = validate_run_metadata(data)
+    assert errors
+
+    # Pydantic model validation should also catch it
+    model, model_errors = validate_pydantic_model(data, RunMetadata)
+    assert model is None
+    assert model_errors
+
+
+def test_pydantic_model_requires_status() -> None:
+    """Test that Pydantic model requires status field."""
+    data = load_example("run-metadata-example.json")
+    # Remove the status field
+    del data["run"]["status"]
+
+    # JSON Schema validation should catch it
+    errors = validate_run_metadata(data)
+    assert errors
+
+    # Pydantic model validation should also catch it
+    model, model_errors = validate_pydantic_model(data, RunMetadata)
+    assert model is None
+    assert model_errors
