@@ -1,31 +1,14 @@
 # Continuous Performance Engineering Platform
 
-A production-grade platform for automated performance validation, regression detection, and continuous performance engineering.
+A production-grade platform for automated performance validation, regression
+detection, and continuous performance engineering.
 
-## Architecture
+For more background, read the AI assisted research:
 
-This platform orchestrates performance testing using:
+- [Continuous Performance Engineering - Research](docs/research.md)
+- [Continuous Performance Engineering - Platform Proposal](docs/project-proposal.md)
 
-- **k6** for API/microservice load testing
-- **Playwright** for browser-based user experience measurements (planned)
-- **kube-burner** for Kubernetes performance testing (planned)
-- **Orion** for historical regression analysis (planned)
-
-## Project Structure
-
-```text
-performance-platform/
-├── platform/               # Core platform code (Python)
-├── tests/                  # Test implementations
-│ ├── k6/                   # k6 test scripts (JavaScript)
-│ └── playwright/           # Playwright tests (TypeScript)
-├── workloads/              # Workload profiles
-├── policies/               # Performance policies
-├── schemas/                # JSON schemas
-├── telemetry/              # Monitoring configurations
-├── deploy/                 # Deployment manifests
-└── docs/                   # Documentation
-```
+We are going to implement a POC of the above research.
 
 ## Quick Start
 
