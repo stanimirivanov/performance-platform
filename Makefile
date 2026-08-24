@@ -89,3 +89,12 @@ install-metrics: ## Install metrics-server
 
 install-namespaces: ## Install perfeng namespaces and RBAC
 	$(SCRIPT_RUNNER) infra/local/scripts/install-namespaces$(SCRIPT_EXT)
+
+# --- Monitoring ---
+.PHONY: monitoring-up monitoring-down
+
+monitoring-up: ## Install monitoring stack
+	$(SCRIPT_RUNNER) infra/local/scripts/install-monitoring$(SCRIPT_EXT)
+
+monitoring-down: ## Uninstall monitoring stack
+	$(SCRIPT_RUNNER) infra/local/scripts/uninstall-monitoring$(SCRIPT_EXT)
