@@ -1,3 +1,4 @@
+# --- Setup & Installation ---
 .PHONY: help setup install generate-models dev-install test lint format clean
 
 help: ## Show this help message
@@ -50,8 +51,38 @@ clean: ## Clean build artifacts
 	rm -rf artifacts/
 	@echo "Clean complete!"
 
+# --- k6 Test ---
+.PHONY: k6-smoke k6-regression
+
 k6-smoke: ## Run k6 smoke test
 	cd tests/k6 && k6 run --config ../../workloads/smoke/checkout.yaml checkout/scenario.js
 
 k6-regression: ## Run k6 regression test
 	cd tests/k6 && k6 run --config ../../workloads/regression/checkout.yaml checkout/scenario.js
+
+# --- k8s Infrastructure ---
+.PHONY: cluster-up cluster-down cluster-status cluster-health install-metrics
+
+# Detect OS and set appropriate script runner
+ifeq ($(OS),Windows_NT)
+    SCRIPT_RUNNER = powershell -ExecutionPolicy Bypass -File
+    SCRIPT_EXT = .ps1
+else
+    SCRIPT_RUNNER = bash
+    SCRIPT_EXT = .sh
+endif
+
+cluster-up: ## Create local kind cluster
+	$(SCRIPT_RUNNER) infra/local/scripts/cluster-up$(SCRIPT_EXT)
+
+cluster-down: ## Delete local kind cluster
+	$(SCRIPT_RUNNER) infra/local/scripts/cluster-down$(SCRIPT_EXT)
+
+cluster-status: ## Show cluster status
+	$(SCRIPT_RUNNER) infra/local/scripts/cluster-status$(SCRIPT_EXT)
+
+cluster-health: ## Run cluster health check
+	$(SCRIPT_RUNNER) infra/local/scripts/cluster-health-check$(SCRIPT_EXT)
+
+install-metrics: ## Install metrics-server
+	$(SCRIPT_RUNNER) infra/local/scripts/install-metrics-server$(SCRIPT_EXT)
