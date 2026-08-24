@@ -23,12 +23,14 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "datamodel-code-generator>=0.74.0",
     "mypy>=2.3.1",
     "pre-commit>=4.6.2",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "pytest-cov>=7.1.0",
     "ruff>=0.16.4",
+    "types-jsonschema>=4.26.0.20260518",
 ]
 
 [build-system]
@@ -36,7 +38,6 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project.scripts]
-perfeng-api = "uvicorn perfeng.api.main:app"
 perfeng-cli = "perfeng.cli:app"
 
 

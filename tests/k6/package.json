@@ -6,6 +6,6 @@
     "test": "k6 run",
     "smoke": "k6 run --config ../../workloads/smoke/checkout.json checkout/scenario.js",
     "regression": "k6 run --config ../../workloads/regression/checkout.json checkout/scenario.js",
-    "stress": "k6 run --config ../../workloads/stress/checkout.yaml checkout/scenario.js"
+    "stress": "k6 run --config ../../workloads/stress/checkout.json checkout/scenario.js"
   }
 }
