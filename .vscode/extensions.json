@@ -2,6 +2,7 @@
   "recommendations": [
     "nrwl.angular-console",
     "esbenp.prettier-vscode",
+    "codista.vscode-autosave",
     "dbaeumer.vscode-eslint",
     "ms-playwright.playwright"
   ]
