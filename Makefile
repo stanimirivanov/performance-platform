@@ -61,7 +61,7 @@ k6-regression: ## Run k6 regression test
 	cd tests/k6 && k6 run --config ../../workloads/regression/checkout.yaml checkout/scenario.js
 
 # --- k8s Infrastructure ---
-.PHONY: cluster-up cluster-down cluster-status cluster-health install-metrics
+.PHONY: cluster-up cluster-down cluster-status cluster-health install-metrics install-namespaces
 
 # Detect OS and set appropriate script runner
 ifeq ($(OS),Windows_NT)
@@ -86,3 +86,6 @@ cluster-health: ## Run cluster health check
 
 install-metrics: ## Install metrics-server
 	$(SCRIPT_RUNNER) infra/local/scripts/install-metrics-server$(SCRIPT_EXT)
+
+install-namespaces: ## Install perfeng namespaces and RBAC
+	$(SCRIPT_RUNNER) infra/local/scripts/install-namespaces$(SCRIPT_EXT)
