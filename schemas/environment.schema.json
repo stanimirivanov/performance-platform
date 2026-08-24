@@ -1,0 +1,101 @@
+{
+  "$schema": "http://json-schema.org/draft/2020-12/schema",
+  "$id": "https://perfeng.dev/schemas/environment.schema.json",
+  "title": "Environment Specification",
+  "description": "Performance test environment specification",
+  "type": "object",
+  "required": ["cluster", "fingerprint"],
+  "properties": {
+    "cluster": {
+      "type": "string",
+      "description": "Cluster identifier"
+    },
+    "fingerprint": {
+      "type": "string",
+      "description": "SHA256 fingerprint of environment characteristics",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "kubernetes": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "description": "Kubernetes version"
+        },
+        "nodeCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "nodePools": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "nodeModel": {
+                "type": "string"
+              },
+              "cpuArchitecture": {
+                "type": "string",
+                "enum": ["amd64", "arm64"]
+              },
+              "cpuCount": {
+                "type": "integer"
+              },
+              "memoryGiB": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "properties": {
+        "containerRuntime": {
+          "type": "string"
+        },
+        "cni": {
+          "type": "string"
+        },
+        "storageClass": {
+          "type": "string"
+        },
+        "kernel": {
+          "type": "string"
+        }
+      }
+    },
+    "application": {
+      "type": "object",
+      "properties": {
+        "configurationHash": {
+          "type": "string"
+        },
+        "featureFlags": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "description": "Compatibility evaluation",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["COMPATIBLE", "PARTIALLY_COMPATIBLE", "INCOMPATIBLE"]
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,4 +1,4 @@
-.PHONY: help setup install dev-install test lint format clean
+.PHONY: help setup install generate-models dev-install test lint format clean
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
@@ -15,6 +15,9 @@ setup: ## Initialize development environment
 install: ## Install all dependencies
 	cd platform && uv sync
 	pnpm install
+
+generate-models: ## Generate Pydantic models from JSON schemas
+	cd platform && uv run python scripts/generate_models.py
 
 test: ## Run all tests
 	cd platform && uv run pytest

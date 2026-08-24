@@ -1,0 +1,294 @@
+{
+  "$schema": "http://json-schema.org/draft/2020-12/schema",
+  "$id": "https://perfeng.dev/schemas/run-metadata.schema.json",
+  "title": "Performance Run Metadata",
+  "description": "Complete metadata for a single performance test run",
+  "type": "object",
+  "required": ["run", "test", "candidate", "environment"],
+  "properties": {
+    "run": {
+      "type": "object",
+      "required": ["id", "suite", "profile", "timestamp", "trigger"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^perf-[0-9]{8}-[0-9]{6}-[a-f0-9]{8}$",
+          "description": "Unique performance run identifier"
+        },
+        "suite": {
+          "type": "string",
+          "description": "Test suite name (e.g., checkout-api, search-flow)"
+        },
+        "profile": {
+          "type": "string",
+          "enum": [
+            "smoke",
+            "average",
+            "regression",
+            "stress",
+            "capacity",
+            "soak"
+          ],
+          "description": "Workload profile used"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Run start timestamp in ISO 8601"
+        },
+        "trigger": {
+          "type": "string",
+          "enum": ["manual", "ci", "schedule", "bisect", "release"],
+          "description": "What triggered this run"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "CREATED",
+            "VALIDATING",
+            "PROVISIONING",
+            "WARMING_UP",
+            "RUNNING",
+            "COLLECTING",
+            "ANALYZING",
+            "REPORTING",
+            "COMPLETED",
+            "INVALID",
+            "ABORTED",
+            "INFRASTRUCTURE_FAILURE",
+            "TEST_FAILURE",
+            "INCONCLUSIVE"
+          ],
+          "description": "Current run state"
+        },
+        "policyVersion": {
+          "type": "string",
+          "description": "Version of the policy used for evaluation"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional notes about this run"
+        }
+      }
+    },
+    "test": {
+      "type": "object",
+      "required": ["type", "tool", "toolVersion", "scenario"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["api", "browser", "kubernetes", "infrastructure"],
+          "description": "Type of performance test"
+        },
+        "tool": {
+          "type": "string",
+          "enum": ["k6", "playwright", "kube-burner", "benchmark-operator"],
+          "description": "Tool used for testing"
+        },
+        "toolVersion": {
+          "type": "string",
+          "description": "Version of the test tool"
+        },
+        "scenario": {
+          "type": "string",
+          "description": "Specific scenario name"
+        },
+        "workloadVersion": {
+          "type": "string",
+          "description": "Version of the workload definition"
+        },
+        "configHash": {
+          "type": "string",
+          "description": "Hash of the test configuration"
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "required": ["gitSha"],
+      "properties": {
+        "gitSha": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$",
+          "description": "Git commit SHA of the candidate"
+        },
+        "imageDigest": {
+          "type": "string",
+          "description": "Container image digest"
+        },
+        "version": {
+          "type": "string",
+          "description": "Application version string"
+        },
+        "branch": {
+          "type": "string",
+          "description": "Git branch name"
+        },
+        "configurationHash": {
+          "type": "string",
+          "description": "Hash of application configuration"
+        },
+        "featureFlags": {
+          "type": "object",
+          "description": "Feature flag settings",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "databaseMigrationVersion": {
+          "type": "string",
+          "description": "Database migration version"
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "required": ["cluster", "kubernetesVersion"],
+      "properties": {
+        "cluster": {
+          "type": "string",
+          "description": "Cluster name"
+        },
+        "kubernetesVersion": {
+          "type": "string",
+          "description": "Kubernetes version"
+        },
+        "nodePool": {
+          "type": "string",
+          "description": "Node pool identifier"
+        },
+        "nodeModel": {
+          "type": "string",
+          "description": "Node hardware model"
+        },
+        "cpuArchitecture": {
+          "type": "string",
+          "enum": ["amd64", "arm64"],
+          "description": "CPU architecture"
+        },
+        "kernel": {
+          "type": "string",
+          "description": "Kernel version"
+        },
+        "containerRuntime": {
+          "type": "string",
+          "description": "Container runtime (containerd, cri-o, etc.)"
+        },
+        "cni": {
+          "type": "string",
+          "description": "Container Network Interface"
+        },
+        "storageClass": {
+          "type": "string",
+          "description": "Storage class used"
+        },
+        "fingerprint": {
+          "type": "string",
+          "description": "Canonical environment fingerprint"
+        },
+        "nodeCount": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of nodes"
+        },
+        "region": {
+          "type": "string",
+          "description": "Geographic region"
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "description": "Runtime resource configuration",
+      "properties": {
+        "replicas": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of replicas"
+        },
+        "cpuRequests": {
+          "type": "string",
+          "description": "CPU requests (e.g., '500m')"
+        },
+        "cpuLimits": {
+          "type": "string",
+          "description": "CPU limits"
+        },
+        "memoryRequests": {
+          "type": "string",
+          "description": "Memory requests (e.g., '512Mi')"
+        },
+        "memoryLimits": {
+          "type": "string",
+          "description": "Memory limits"
+        },
+        "hpa": {
+          "type": "object",
+          "description": "Horizontal Pod Autoscaler configuration",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "minReplicas": {
+              "type": "integer"
+            },
+            "maxReplicas": {
+              "type": "integer"
+            },
+            "targetCpuUtilization": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    },
+    "data": {
+      "type": "object",
+      "description": "Test data information",
+      "properties": {
+        "datasetId": {
+          "type": "string",
+          "description": "Dataset identifier"
+        },
+        "datasetVersion": {
+          "type": "string",
+          "description": "Dataset version"
+        },
+        "databaseSize": {
+          "type": "string",
+          "description": "Database size (e.g., '10GB')"
+        },
+        "seedVersion": {
+          "type": "string",
+          "description": "Data seed version"
+        }
+      }
+    },
+    "phases": {
+      "type": "object",
+      "description": "Timing information for different phases",
+      "properties": {
+        "provisionStart": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "warmupStart": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "measurementStart": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "measurementEnd": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "cooldownEnd": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}
