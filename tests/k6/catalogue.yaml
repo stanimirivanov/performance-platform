@@ -1,0 +1,104 @@
+apiVersion: performance.perfeng.io/v1
+kind: TestCatalogue
+metadata:
+  name: k6-tests
+  version: '1.0.0'
+
+tests:
+  - id: checkout-api
+    name: Checkout API Performance Test
+    owner: payments-team
+    criticality: critical
+    tool: k6
+    description: Tests the checkout API flow including cart and payment processing
+
+    profiles:
+      - smoke
+      - regression
+      - stress
+      - capacity
+
+    schedule:
+      pr: smoke
+      nightly: regression
+      release: stress
+
+    metrics:
+      - name: api.checkout.cart.get.duration_p95
+        direction: lower-is-better
+        type: latency
+        unit: ms
+      - name: api.checkout.checkout.post.duration_p95
+        direction: lower-is-better
+        type: latency
+        unit: ms
+      - name: biz.checkout.submit_to_confirmation.duration_p95
+        direction: lower-is-better
+        type: latency
+        unit: ms
+      - name: api.checkout.error_rate
+        direction: lower-is-better
+        type: error_rate
+        unit: percent
+      - name: api.checkout.throughput
+        direction: higher-is-better
+        type: throughput
+        unit: req/s
+
+  - id: search-api
+    name: Search API Performance Test
+    owner: search-team
+    criticality: high
+    tool: k6
+    description: Tests the search API for query performance
+
+    profiles:
+      - smoke
+      - regression
+
+    schedule:
+      pr: smoke
+      nightly: regression
+
+    metrics:
+      - name: api.search.query.get.duration_p95
+        direction: lower-is-better
+        type: latency
+        unit: ms
+      - name: biz.search.query_to_results.duration_p95
+        direction: lower-is-better
+        type: latency
+        unit: ms
+      - name: api.search.error_rate
+        direction: lower-is-better
+        type: error_rate
+        unit: percent
+
+  - id: account-api
+    name: Account API Performance Test
+    owner: identity-team
+    criticality: medium
+    tool: k6
+    description: Tests account management API operations
+
+    profiles:
+      - smoke
+      - regression
+
+    schedule:
+      pr: smoke
+      nightly: regression
+
+    metrics:
+      - name: api.account.user.get.duration_p95
+        direction: lower-is-better
+        type: latency
+        unit: ms
+      - name: api.account.user.put.duration_p95
+        direction: lower-is-better
+        type: latency
+        unit: ms
+      - name: api.account.error_rate
+        direction: lower-is-better
+        type: error_rate
+        unit: percent
