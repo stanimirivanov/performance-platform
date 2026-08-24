@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "test": "k6 run",
-    "smoke": "k6 run --config ../../workloads/smoke/checkout.yaml checkout/scenario.js",
-    "regression": "k6 run --config ../../workloads/regression/checkout.yaml checkout/scenario.js",
+    "smoke": "k6 run --config ../../workloads/smoke/checkout.json checkout/scenario.js",
+    "regression": "k6 run --config ../../workloads/regression/checkout.json checkout/scenario.js",
     "stress": "k6 run --config ../../workloads/stress/checkout.yaml checkout/scenario.js"
   }
 }
