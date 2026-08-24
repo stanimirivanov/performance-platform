@@ -65,11 +65,13 @@
           "description": "Current run state"
         },
         "policyVersion": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "description": "Version of the policy used for evaluation"
         },
         "notes": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "maxLength": 1000,
           "description": "Optional notes about this run"
         }
@@ -101,11 +103,13 @@
           "description": "Specific scenario name"
         },
         "workloadVersion": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "description": "Version of the workload definition"
         },
         "configHash": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "description": "Hash of the test configuration"
         }
       }
@@ -121,30 +125,36 @@
           "description": "Git commit SHA of the candidate"
         },
         "imageDigest": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "description": "Container image digest"
         },
         "version": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "description": "Application version string"
         },
         "branch": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "description": "Git branch name"
         },
         "configurationHash": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "description": "Hash of application configuration"
         },
         "featureFlags": {
-          "type": "object",
+          "type": ["object", "null"],
+          "default": null,
           "description": "Feature flag settings",
           "additionalProperties": {
             "type": ["string", "boolean", "number", "null"]
           }
         },
         "databaseMigrationVersion": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "description": "Database migration version"
         }
       }
@@ -165,98 +175,119 @@
           "description": "Kubernetes version"
         },
         "nodePool": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "description": "Node pool identifier"
         },
         "nodeModel": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "description": "Node hardware model"
         },
         "cpuArchitecture": {
-          "type": "string",
-          "enum": ["amd64", "arm64"],
-          "description": "CPU architecture"
+          "type": ["string", "null"],
+          "default": null,
+          "pattern": "^(amd64|arm64)$",
+          "description": "CPU architecture (e.g., amd64, arm64)"
         },
         "kernel": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "description": "Kernel version"
         },
         "containerRuntime": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "description": "Container runtime (containerd, cri-o, etc.)"
         },
         "cni": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "description": "Container Network Interface"
         },
         "storageClass": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "description": "Storage class used"
         },
         "fingerprint": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "pattern": "^[a-f0-9]{64}$",
           "description": "Canonical environment fingerprint"
         },
         "nodeCount": {
-          "type": "integer",
+          "type": ["integer", "null"],
+          "default": null,
           "minimum": 1,
           "description": "Number of nodes"
         },
         "region": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "description": "Geographic region"
         }
       }
     },
     "runtime": {
-      "type": "object",
+      "type": ["object", "null"],
+      "default": null,
       "description": "Runtime resource configuration",
       "additionalProperties": false,
       "properties": {
         "replicas": {
-          "type": "integer",
+          "type": ["integer", "null"],
+          "default": null,
           "minimum": 1,
           "description": "Number of replicas"
         },
         "cpuRequests": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "pattern": "^\\d+(\\.\\d+)?m?$",
           "description": "CPU requests (e.g., '500m')"
         },
         "cpuLimits": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "pattern": "^\\d+(\\.\\d+)?m?$",
           "description": "CPU limits"
         },
         "memoryRequests": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "pattern": "^\\d+(\\.\\d+)?(Ki|Mi|Gi|Ti|K|M|G|T)?$",
           "description": "Memory requests (e.g., '512Mi')"
         },
         "memoryLimits": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "pattern": "^\\d+(\\.\\d+)?(Ki|Mi|Gi|Ti|K|M|G|T)?$",
           "description": "Memory limits"
         },
         "hpa": {
-          "type": "object",
+          "type": ["object", "null"],
+          "default": null,
           "description": "Horizontal Pod Autoscaler configuration",
           "additionalProperties": false,
           "properties": {
             "enabled": {
-              "type": "boolean"
+              "type": ["boolean", "null"],
+              "default": null
             },
             "minReplicas": {
-              "type": "integer",
+              "type": ["integer", "null"],
+              "default": null,
               "minimum": 1
             },
             "maxReplicas": {
-              "type": "integer",
+              "type": ["integer", "null"],
+              "default": null,
               "minimum": 1
             },
             "targetCpuUtilization": {
-              "type": "integer",
+              "type": ["integer", "null"],
+              "default": null,
               "minimum": 1,
               "maximum": 100
             }
@@ -265,52 +296,63 @@
       }
     },
     "data": {
-      "type": "object",
+      "type": ["object", "null"],
+      "default": null,
       "description": "Test data information",
       "additionalProperties": false,
       "properties": {
         "datasetId": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "description": "Dataset identifier"
         },
         "datasetVersion": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "description": "Dataset version"
         },
         "databaseSize": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "pattern": "^\\d+(\\.\\d+)?(KB|MB|GB|TB|KiB|MiB|GiB|TiB)$",
           "description": "Database size (e.g., '10GB')"
         },
         "seedVersion": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "description": "Data seed version"
         }
       }
     },
     "phases": {
-      "type": "object",
+      "type": ["object", "null"],
+      "default": null,
       "description": "Timing information for different phases",
       "additionalProperties": false,
       "properties": {
         "provisionStart": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "format": "date-time"
         },
         "warmupStart": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "format": "date-time"
         },
         "measurementStart": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "format": "date-time"
         },
         "measurementEnd": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "format": "date-time"
         },
         "cooldownEnd": {
-          "type": "string",
+          "type": ["string", "null"],
+          "default": null,
           "format": "date-time"
         }
       }

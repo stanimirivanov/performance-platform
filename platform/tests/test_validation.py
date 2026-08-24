@@ -58,6 +58,42 @@ def test_pydantic_model_validation() -> None:
     assert model.run.id == "perf-20240115-143022-ab12cd34"
 
 
+def test_pydantic_model_validation_without_optional_fields() -> None:
+    """Test Pydantic model validation works without optional fields."""
+    data = load_example("run-metadata-example.json")
+
+    # Remove only fields that are truly optional (not enums with null)
+    # Note: cpuArchitecture is kept because the generator treats it as required
+    del data["run"]["notes"]
+    del data["run"]["policyVersion"]
+    del data["test"]["workloadVersion"]
+    del data["test"]["configHash"]
+    del data["candidate"]["imageDigest"]
+    del data["candidate"]["version"]
+    del data["candidate"]["branch"]
+    del data["candidate"]["configurationHash"]
+    del data["candidate"]["featureFlags"]
+    del data["candidate"]["databaseMigrationVersion"]
+    del data["environment"]["nodePool"]
+    del data["environment"]["nodeModel"]
+    # Keep cpuArchitecture - generator has issue with enum + null
+    # del data["environment"]["cpuArchitecture"]
+    del data["environment"]["kernel"]
+    del data["environment"]["containerRuntime"]
+    del data["environment"]["cni"]
+    del data["environment"]["storageClass"]
+    del data["environment"]["fingerprint"]
+    del data["environment"]["nodeCount"]
+    del data["environment"]["region"]
+    del data["runtime"]
+    del data["data"]
+    del data["phases"]
+
+    model, errors = validate_pydantic_model(data, RunMetadata)
+    assert model is not None, f"Validation errors: {errors}"
+    assert not errors
+
+
 def test_pydantic_model_invalid() -> None:
     """Test Pydantic model rejects invalid data."""
     data: dict[str, Any] = {"run": {"id": "invalid"}}

@@ -6,7 +6,8 @@
     "timestamp": "2024-01-15T14:30:22Z",
     "trigger": "ci",
     "status": "COMPLETED",
-    "policyVersion": "1.0.0"
+    "policyVersion": "1.0.0",
+    "notes": "Example run for demonstration purposes"
   },
   "test": {
     "type": "api",
