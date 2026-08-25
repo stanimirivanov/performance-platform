@@ -2,9 +2,9 @@
   "scenarios": {
     "checkout_flow": {
       "executor": "ramping-arrival-rate",
-      "startRate": 5,
+      "startRate": 1,
       "timeUnit": "1s",
-      "preAllocatedVUs": 4,
+      "preAllocatedVUs": 2,
       "maxVUs": 20,
       "stages": [
         { "duration": "30s", "target": 5 },
