@@ -1,7 +1,7 @@
 import { check, sleep } from 'k6';
 import http from 'k6/http';
-import { getApiUrl, getHeaders } from '../lib/config.js';
-import { errorRate, searchDuration } from '../lib/metrics.js';
+import { getApiUrl, getHeaders } from '../../lib/config.js';
+import { errorRate, searchDuration } from '../../lib/metrics.js';
 
 export const options = {
   scenarios: {

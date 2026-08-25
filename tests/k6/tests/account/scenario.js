@@ -1,6 +1,6 @@
 import { check, sleep } from 'k6';
 import http from 'k6/http';
-import { generateRandomId, getApiUrl, getHeaders } from '../lib/config.js';
+import { generateRandomId, getApiUrl, getHeaders } from '../../lib/config.js';
 
 export const options = {
   scenarios: {

@@ -1,12 +1,12 @@
 import { check, sleep } from 'k6';
 import http from 'k6/http';
-import { getApiUrl, getHeaders } from '../lib/config.js';
+import { getApiUrl, getHeaders } from '../../lib/config.js';
 import {
   checkoutDuration,
   errorRate,
   failedTransactions,
   successfulTransactions,
-} from '../lib/metrics.js';
+} from '../../lib/metrics.js';
 
 export const options = {
   scenarios: {
