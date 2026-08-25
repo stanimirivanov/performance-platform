@@ -98,3 +98,28 @@ monitoring-up: ## Install monitoring stack
 
 monitoring-down: ## Uninstall monitoring stack
 	$(SCRIPT_RUNNER) infra/local/scripts/uninstall-monitoring$(SCRIPT_EXT)
+
+
+# --- k6 Infrastructure ---
+.PHONY: install-minio
+
+install-minio: ## Install MinIO for artifact storage
+	$(SCRIPT_RUNNER) infra/local/scripts/install-minio$(SCRIPT_EXT)
+
+# --- k6 Tests ---
+.PHONY: run-k6-smoke run-k6-regression run-k6-test
+
+ifeq ($(OS),Windows_NT)
+    RUN_K6 = powershell -ExecutionPolicy Bypass -File infra/local/kind/k6-jobs/scripts/run-k6-test.ps1
+else
+    RUN_K6 = bash infra/local/kind/k6-jobs/scripts/run-k6-test.sh
+endif
+
+run-k6-smoke: ## Run k6 smoke test as Kubernetes job
+	$(RUN_K6) --test-name checkout --profile smoke
+
+run-k6-regression: ## Run k6 regression test as Kubernetes job
+	$(RUN_K6) --test-name checkout --profile regression
+
+run-k6-test: ## Run k6 test as Kubernetes job (usage: make run-k6-test TEST=checkout PROFILE=smoke)
+	$(RUN_K6) --test-name $(TEST) --profile $(PROFILE)
