@@ -7,6 +7,9 @@
     "smoke:checkout": "k6 run --config workloads/smoke/checkout.json tests/checkout/scenario.js",
     "smoke:search": "k6 run --config workloads/smoke/search.json tests/search/scenario.js",
     "smoke:account": "k6 run --config workloads/smoke/account.json tests/account/scenario.js",
+    "average:checkout": "k6 run --config workloads/average/checkout.json tests/checkout/scenario.js",
+    "average:search": "k6 run --config workloads/average/search.json tests/search/scenario.js",
+    "average:account": "k6 run --config workloads/average/account.json tests/account/scenario.js",
     "regression:checkout": "k6 run --config workloads/regression/checkout.json tests/checkout/scenario.js",
     "regression:search": "k6 run --config workloads/regression/search.json tests/search/scenario.js",
     "regression:account": "k6 run --config workloads/regression/account.json tests/account/scenario.js",
@@ -14,7 +17,9 @@
     "stress:search": "k6 run --config workloads/stress/search.json tests/search/scenario.js",
     "capacity:checkout": "k6 run --config workloads/capacity/checkout.json tests/checkout/scenario.js",
     "smoke": "pnpm smoke:checkout && pnpm smoke:search && pnpm smoke:account",
+    "average": "pnpm average:checkout && pnpm average:search && pnpm average:account",
     "regression": "pnpm regression:checkout && pnpm regression:search && pnpm regression:account",
+    "stress": "pnpm stress:checkout && pnpm stress:search",
     "docker:build": "docker build -t perfeng-k6-tests .",
     "docker:run": "docker run --rm -v $(pwd):/tests perfeng-k6-tests"
   }

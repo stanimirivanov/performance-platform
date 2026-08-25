@@ -1,0 +1,19 @@
+{
+  "scenarios": {
+    "account_flow": {
+      "executor": "ramping-vus",
+      "startVUs": 10,
+      "stages": [
+        { "duration": "2m", "target": 25 },
+        { "duration": "5m", "target": 25 },
+        { "duration": "2m", "target": 0 }
+      ]
+    }
+  },
+  "thresholds": {
+    "biz_account_operation_duration": ["p(95)<350"],
+    "biz_transaction_error_rate": ["rate<0.01"],
+    "http_req_duration": ["p(95)<350"],
+    "http_req_failed": ["rate<0.01"]
+  }
+}
