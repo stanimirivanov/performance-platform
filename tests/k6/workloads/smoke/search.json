@@ -11,6 +11,7 @@
   },
   "thresholds": {
     "biz_search_duration": ["p(95)<300"],
+    "biz_transaction_error_rate": ["rate<0.02"],
     "http_req_duration": ["p(95)<300"],
     "http_req_failed": ["rate<0.02"]
   }

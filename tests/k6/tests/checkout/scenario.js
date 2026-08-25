@@ -3,9 +3,9 @@ import http from 'k6/http';
 import { getApiUrl, getHeaders } from '../../lib/config.js';
 import {
   checkoutDuration,
-  errorRate,
   failedTransactions,
   successfulTransactions,
+  transactionErrorRate,
 } from '../../lib/metrics.js';
 
 export const options = {
@@ -24,7 +24,7 @@ export const options = {
     },
   },
   thresholds: {
-    checkout_duration: ['p(95)<500', 'p(99)<1000'],
+    biz_checkout_duration: ['p(95)<500', 'p(99)<1000'],
     http_req_failed: ['rate<0.01'],
   },
 };
@@ -65,12 +65,11 @@ export default function () {
 
   if (checkoutSuccess) {
     successfulTransactions.add(1);
-    errorRate.add(false);
+    transactionErrorRate.add(false);
   } else {
     failedTransactions.add(1);
-    errorRate.add(true);
+    transactionErrorRate.add(true);
   }
 
-  // Simulate user think time
-  sleep(Math.random() * 2 + 1); // 1-3 seconds
+  sleep(Math.random() * 2 + 1);
 }

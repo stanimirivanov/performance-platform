@@ -11,6 +11,8 @@
     }
   },
   "thresholds": {
+    "biz_account_operation_duration": ["p(95)<400"],
+    "biz_transaction_error_rate": ["rate<0.02"],
     "http_req_duration": ["p(95)<400"],
     "http_req_failed": ["rate<0.02"]
   }
