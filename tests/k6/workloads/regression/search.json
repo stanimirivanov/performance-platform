@@ -1,0 +1,17 @@
+{
+  "scenarios": {
+    "search_flow": {
+      "executor": "constant-arrival-rate",
+      "rate": 20,
+      "timeUnit": "1s",
+      "duration": "15m",
+      "preAllocatedVUs": 30,
+      "maxVUs": 100
+    }
+  },
+  "thresholds": {
+    "biz_search_duration": ["p(95)<300", "p(99)<500"],
+    "http_req_duration": ["p(95)<300", "p(99)<500"],
+    "http_req_failed": ["rate<0.005"]
+  }
+}

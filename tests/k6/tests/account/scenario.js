@@ -1,6 +1,10 @@
 import { check, sleep } from 'k6';
 import http from 'k6/http';
-import { generateRandomId, getApiUrl, getHeaders } from '../lib/config.js';
+import { generateRandomId, getApiUrl, getHeaders } from '../../lib/config.js';
+import {
+  accountOperationDuration,
+  transactionErrorRate,
+} from '../../lib/metrics.js';
 
 export const options = {
   scenarios: {
@@ -15,6 +19,7 @@ export const options = {
     },
   },
   thresholds: {
+    biz_account_operation_duration: ['p(95)<400'],
     http_req_duration: ['p(95)<400'],
     http_req_failed: ['rate<0.02'],
   },
@@ -25,18 +30,22 @@ export default function () {
   const userId = generateRandomId('user');
 
   // Get user profile
+  const startTime = Date.now();
   const profileResponse = http.get(getApiUrl(`/users/${userId}`), { headers });
-  check(profileResponse, {
+  const profileLoaded = check(profileResponse, {
     'profile loaded': (r) => r.status === 200 || r.status === 404,
   });
 
   // Update user preferences
   const updateResponse = http.put(
-    getApiUrl(`/users/${userId}/preferences`),
-    JSON.stringify({ theme: 'dark', language: 'en' }),
-    { headers },
+      getApiUrl(`/users/${userId}/preferences`),
+      JSON.stringify({ theme: 'dark', language: 'en' }),
+      { headers },
   );
   check(updateResponse, { 'preferences updated': (r) => r.status === 200 });
 
-  sleep(Math.random() * 2 + 0.5); // 0.5-2.5 seconds
+  accountOperationDuration.add(Date.now() - startTime);
+  transactionErrorRate.add(!profileLoaded);
+
+  sleep(Math.random() * 2 + 0.5);
 }

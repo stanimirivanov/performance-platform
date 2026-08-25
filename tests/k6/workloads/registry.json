@@ -1,0 +1,67 @@
+{
+  "version": "1.0.0",
+  "tool": "k6",
+  "profiles": {
+    "smoke": {
+      "description": "Quick validation tests (2 minutes)",
+      "purpose": "Verify basic functionality",
+      "defaultThresholds": {
+        "http_req_failed": "rate<0.02"
+      }
+    },
+    "average": {
+      "description": "Average production load simulation",
+      "purpose": "Simulate typical production traffic",
+      "defaultThresholds": {
+        "http_req_failed": "rate<0.01"
+      }
+    },
+    "regression": {
+      "description": "Standard regression tests (15 minutes)",
+      "purpose": "Detect performance regressions",
+      "defaultThresholds": {
+        "http_req_failed": "rate<0.005"
+      }
+    },
+    "stress": {
+      "description": "High load stress tests (10 minutes)",
+      "purpose": "Test system under extreme load",
+      "defaultThresholds": {
+        "http_req_failed": "rate<0.1"
+      }
+    },
+    "capacity": {
+      "description": "Maximum capacity tests (30 minutes)",
+      "purpose": "Find maximum sustainable throughput",
+      "defaultThresholds": {
+        "http_req_failed": "rate<0.05"
+      }
+    }
+  },
+  "testScenarios": {
+    "checkout": {
+      "description": "Checkout flow API test",
+      "owner": "payments-team",
+      "criticality": "critical",
+      "supportedProfiles": [
+        "smoke",
+        "average",
+        "regression",
+        "stress",
+        "capacity"
+      ]
+    },
+    "search": {
+      "description": "Search API test",
+      "owner": "search-team",
+      "criticality": "high",
+      "supportedProfiles": ["smoke", "regression", "stress"]
+    },
+    "account": {
+      "description": "Account API test",
+      "owner": "identity-team",
+      "criticality": "medium",
+      "supportedProfiles": ["smoke", "regression"]
+    }
+  }
+}

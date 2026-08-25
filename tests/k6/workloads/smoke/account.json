@@ -1,11 +1,8 @@
 {
   "scenarios": {
-    "checkout_flow": {
-      "executor": "ramping-arrival-rate",
-      "startRate": 5,
-      "timeUnit": "1s",
-      "preAllocatedVUs": 4,
-      "maxVUs": 20,
+    "account_flow": {
+      "executor": "ramping-vus",
+      "startVUs": 1,
       "stages": [
         { "duration": "30s", "target": 5 },
         { "duration": "1m", "target": 5 },
@@ -14,7 +11,9 @@
     }
   },
   "thresholds": {
-    "checkout_duration": ["p(95)<600"],
+    "biz_account_operation_duration": ["p(95)<400"],
+    "biz_transaction_error_rate": ["rate<0.02"],
+    "http_req_duration": ["p(95)<400"],
     "http_req_failed": ["rate<0.02"]
   }
 }

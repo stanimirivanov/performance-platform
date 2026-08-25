@@ -14,7 +14,9 @@
     }
   },
   "thresholds": {
-    "checkout_duration": ["p(95)<400", "p(99)<800"],
+    "biz_checkout_duration": ["p(95)<400", "p(99)<800"],
+    "biz_transaction_error_rate": ["rate<0.005"],
+    "http_req_duration": ["p(95)<400", "p(99)<800"],
     "http_req_failed": ["rate<0.005"]
   }
 }
