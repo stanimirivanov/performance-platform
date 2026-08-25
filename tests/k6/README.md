@@ -83,3 +83,35 @@ docker run --rm \
 | `perf_ttfb`                   | Trend   | Time to first byte            |
 | `perf_ttc`                    | Trend   | Time to complete              |
 | `perf_active_vus`             | Gauge   | Active virtual users          |
+
+## Nx
+```bash
+# Show all projects
+pnpm nx show projects
+
+# Show project details
+pnpm nx show project k6-tests
+pnpm nx show project tests-playwright
+
+# Run specific target
+pnpm nx run k6-tests:smoke
+pnpm nx run tests-playwright:e2e
+
+# Run multiple projects
+pnpm nx run-many --target=test
+
+# Show dependency graph
+pnpm nx graph
+
+# Generate new project
+pnpm nx g @nx/js:lib my-lib
+
+# Run affected projects only
+pnpm nx affected --target=test
+
+# Format all projects
+pnpm nx format:write
+
+# Lint all projects
+pnpm nx run-many --target=lint
+```

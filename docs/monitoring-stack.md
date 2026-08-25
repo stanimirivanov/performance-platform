@@ -9,15 +9,13 @@ the foundation for performance telemetry collection and correlation.
 ## Components
 
 | Component          | Version | Purpose                        | Port                   |
-| ------------------ | ------- | ------------------------------ | ---------------------- |
+|--------------------|---------|--------------------------------|------------------------|
 | Prometheus         | v2.53.0 | Metrics collection and storage | 9090                   |
 | kube-state-metrics | v2.13.0 | Kubernetes object metrics      | 8080                   |
 | node-exporter      | v1.8.2  | Node-level system metrics      | 9100                   |
 | Grafana            | v11.1.0 | Visualization dashboards       | 3000 (NodePort: 30300) |
 
 ## Architecture
-
-Thramsorm this to mermaid:
 
 ```mermaid
 graph TD
@@ -64,22 +62,22 @@ kubectl port-forward -n monitoring svc/prometheus 9090:9090
 
 Then access: [http://localhost:9090](http://localhost:9090)
 
-### Prometheus Configuration
+## Prometheus Configuration
 
-#### Scrape Intervals
+### Scrape Intervals
 
 - Default: 15 seconds
 - Evaluation: 15 seconds
 
-#### Retention
+### Retention
 
 - Time: 7 days
 - Size: 8GB
 
-#### Scrape Targets
+### Scrape Targets
 
 | Job                     | Target                     | Purpose                   |
-| ----------------------- | -------------------------- | ------------------------- |
+|-------------------------|----------------------------|---------------------------|
 | `prometheus`            | `localhost:9090`           | Self-monitoring           |
 | `kubernetes-apiservers` | Kubernetes API             | API server metrics        |
 | `kubernetes-nodes`      | Kubelet                    | Node metrics              |
@@ -87,9 +85,9 @@ Then access: [http://localhost:9090](http://localhost:9090)
 | `node-exporter`         | node-exporter endpoints    | System metrics            |
 | `kubernetes-pods`       | Annotated pods             | Application metrics       |
 
-### Recording Rules
+## Recording Rules
 
-#### cluster:node_cpu:avg
+### cluster:node_cpu:avg
 
 ```promql
 avg(rate(node_cpu_seconds_total{mode!="idle"}[5m])) \* 100
@@ -97,7 +95,7 @@ avg(rate(node_cpu_seconds_total{mode!="idle"}[5m])) \* 100
 
 Average CPU usage across all nodes (percentage).
 
-#### cluster:pod_cpu:sum
+### cluster:pod_cpu:sum
 
 ```promql
 sum(rate(container_cpu_usage_seconds_total{container!=""}[5m])) by (namespace, pod)
@@ -105,7 +103,7 @@ sum(rate(container_cpu_usage_seconds_total{container!=""}[5m])) by (namespace, p
 
 CPU usage summed by namespace and pod.
 
-#### cluster:node_memory:avg
+### cluster:node_memory:avg
 
 ```promql
 avg(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / avg(node_memory_MemTotal_bytes) \* 100
@@ -113,7 +111,7 @@ avg(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / avg(node_memo
 
 Average memory usage across all nodes (percentage).
 
-#### cluster:pod_count:sum
+### cluster:pod_count:sum
 
 ```promql
 sum(kube_pod_info) by (namespace)
@@ -121,35 +119,36 @@ sum(kube_pod_info) by (namespace)
 
 Pod count by namespace.
 
-### Common Queries
+## Common Queries
 
-#### Node CPU Usage
+### Node CPU Usage
 
 ```promql
 100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) \* 100)
 ```
 
-#### Pod Memory Usage
+### Pod Memory Usage
 
 ```promql
 sum(container_memory_working_set_bytes{container!=""}) by (namespace, pod)
 ```
 
-#### Pod Restart Count
+### Pod Restart Count
 
 ```promql
 sum(kube_pod_container_status_restarts_total) by (namespace, pod)
 ```
 
-#### Deployment Replicas
+### Deployment Replicas
 
 ```promql
 kube_deployment_status_replicas_available
 ```
 
-### Adding Application Metrics
+## Adding Application Metrics
 
-To have Prometheus scrape application metrics, add these annotations to your pod spec:
+To have Prometheus scrape application metrics, add these annotations to your pod
+spec:
 
 ```yaml
 metadata:
@@ -160,22 +159,29 @@ prometheus.io/path: '/metrics'
 ```
 
 | Component  | PVC               | Size | StorageClass |
-| ---------- | ----------------- | ---: | ------------ |
+|------------|-------------------|-----:|--------------|
 | Prometheus | `prometheus-data` | 10Gi | `standard`   |
 | Grafana    | `grafana-data`    |  5Gi | `standard`   |
 
-### Management Commands
+## Management Commands
 
-#### Install
+### Helm Deployment
+
+The monitoring stack is deployed as part of the `perfeng-infra` Helm chart.
+
+### Sub-Charts
+
+| Component          | Sub-Chart            | Namespace  |
+|--------------------|----------------------|------------|
+| Prometheus         | `prometheus`         | monitoring |
+| Grafana            | `grafana`            | monitoring |
+| kube-state-metrics | `kube-state-metrics` | monitoring |
+| node-exporter      | `node-exporter`      | monitoring |
+
+### Install
 
 ```bash
-make monitoring-up
-```
-
-#### Uninstall
-
-```bash
-make monitoring-down
+make infra-install
 ```
 
 #### Check Status
@@ -252,7 +258,7 @@ kubectl get storageclass
 ### Resource Usage
 
 | Component          | CPU Request | CPU Limit | Memory Request | Memory Limit |
-| ------------------ | ----------: | --------: | -------------: | -----------: |
+|--------------------|------------:|----------:|---------------:|-------------:|
 | Prometheus         |        100m |      500m |          256Mi |          1Gi |
 | kube-state-metrics |         50m |      200m |           64Mi |        256Mi |
 | node-exporter      |         50m |      200m |           32Mi |        128Mi |

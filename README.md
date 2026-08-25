@@ -20,60 +20,41 @@ We are going to implement a POC of the above research.
 - k6 (for running load tests)
 - Docker (for local Kubernetes)
 
-### Development Setup
+## Local Development Setup
+
+### Prerequisites
+
+- Docker Desktop
+- kind
+- kubectl
+- Helm 3+
+
+### Quick Start
 
 ```bash
-# Install Python dependencies
-cd platform
-uv sync
-cd ..
+# 1. Create cluster
+make cluster-up
 
-# Install JavaScript dependencies
-pnpm install
+# 2. Install infrastructure
+make infra-install
 
-# Set up pre-commit hooks
-pre-commit install
-```
+# 3. Install sample SUT
+make sut-install
 
-### Running Tests
+# 4. Run a smoke test
+make k6-search-smoke
+````
 
-```bash
-# Run k6 smoke test
-make k6-smoke
+## Documentation
 
-# Run all tests
-make test
-```
+- [Local Setup Guide](docs/local-setup.md)
+- [Monitoring Stack](docs/monitoring-stack.md)
+- [Architecture](docs/architecture)
 
-### Nx Commands
+## Helm Charts
 
-```bash
-# Show all projects
-pnpm nx show projects
-
-# Show project details
-pnpm nx show project k6-tests
-pnpm nx show project tests-playwright
-
-# Run specific target
-pnpm nx run k6-tests:smoke
-pnpm nx run tests-playwright:e2e
-
-# Run multiple projects
-pnpm nx run-many --target=test
-
-# Show dependency graph
-pnpm nx graph
-
-# Generate new project
-pnpm nx g @nx/js:lib my-lib
-
-# Run affected projects only
-pnpm nx affected --target=test
-
-# Format all projects
-pnpm nx format:write
-
-# Lint all projects
-pnpm nx run-many --target=lint
-```
+| Chart           | Location                     | Purpose                   |
+|-----------------|------------------------------|---------------------------|
+| `perfeng-infra` | `infra/charts/perfeng-infra` | Infrastructure components |
+| `sample-sut`    | `infra/charts/sample-sut`    | Test target               |
+| `k6-runner`     | `infra/charts/k6-runner`     | k6 test execution         |

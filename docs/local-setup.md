@@ -1,191 +1,269 @@
 # Local Kubernetes Cluster Setup
 
+- ## Overview
+
+This guide explains how to set up the PerfEng local development environment
+using:
+
+- **kind** (Kubernetes in Docker) for the cluster
+- **Helm** for infrastructure deployment
+- **Docker** for container images
+
 ## Prerequisites
+
+Install the following dependencies for your OS.
 
 - Docker Desktop (or Docker Engine)
 - kind (Kubernetes in Docker)
 - kubectl
+- Helm 3+
 
-## Installation
+Ensure Docker Desktop is running and has at least:
 
-### Install Docker
+- 4 CPUs
+- 8GB RAM
+- 60GB Disk Space
 
-Download and install Docker Desktop from: https://www.docker.com/products/docker-desktop
+## Cluster Management
 
-### Install kind
-
-```bash
-# Windows (using winget)
-winget install Kubernetes.kind
-
-# macOS (using Homebrew)
-brew install kind
-
-# Linux
-curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
-chmod +x ./kind
-sudo mv ./kind /usr/local/bin/kind
-```
-
-### Install kubectl
-
-```bash
-# Windows (using winget)
-winget install Kubernetes.kubectl
-
-# macOS (using Homebrew)
-brew install kubectl
-
-# Linux
-curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-chmod +x kubectl
-sudo mv kubectl /usr/local/bin/
-```
-
-### Cluster Management
-
-#### Create Cluster
+### Create Cluster
 
 ```bash
 make cluster-up
 ```
 
-This creates a kind cluster named perfeng-local with:
+This creates a kind cluster named `perfeng-local` with:
 
-- 1 control plane node
-- 1 worker node for performance generators (workload=performance-generator)
-- 1 worker node for SUT (workload=sut)
+- 1 control plane node (`workload=control-plane`)
+- 1 worker node for generators (`workload=performance-generator`)
+- 1 worker node for SUT (`workload=sut`)
 
-#### Check Cluster Status
-
-```bash
-make cluster-status
-```
-
-#### Run Health Check
+### Check Cluster Status
 
 ```bash
 make cluster-health
 ```
 
-#### Install metrics-server
-
-```bash
-make install-metrics
-```
-
-#### Delete Cluster
+### Delete Cluster
 
 ```bash
 make cluster-down
 ```
 
+## Infrastructure Deployment
+
+The infrastructure is deployed via Helm charts.
+
+### Manage Infrastructure
+
+```bash
+make infra-install
+```
+
+This installs:
+
+- **Namespaces**: perf-platform, perf-generators, perf-sut, monitoring
+- **RBAC**: ServiceAccounts, Roles, RoleBindings, ClusterRoles,
+  ClusterRoleBindings
+- **Network Policies**: Default deny, allow rules, DNS egress
+- **Resource Quotas**: ResourceQuotas and LimitRanges
+- **Metrics Server**: For kubectl top commands
+- **MinIO**: Object storage for test artifacts
+- **Prometheus**: Metrics collection
+- **Grafana**: Visualization dashboards
+- **kube-state-metrics**: Kubernetes object metrics
+- **node-exporter**: Node system metrics
+
+Other infrastructure commands can be found in [Makefile](../Makefile).
+
+## Sample SUT Management
+
+A sample System Under Test is provided for testing purposes. Install, check
+status and uninstall can be achieved with:
+
+```bash
+make sut-install
+make sut-status
+make sut-uninstall
+```
+
+## k6 Performance Testing
+
+K6 testing in the cluster depends on building the Docker image and the sample 
+sut or other target. 
+
+```bash
+## Install sample SUT
+make sut-install
+
+# k6 Test Runner
+make k6-build-image
+
+## Run k6 checkout smoke test
+k6-smoke: k6-build-image
+
+## Run k6 search smoke test
+k6-search-smoke: k6-build-image 
+```
+
+Other k6 test commands can be found in [Makefile](../Makefile).
+
+## Access Points
+
+### Grafana
+
+- **URL**: http://localhost:30300
+- **Username**: admin
+- **Password**: admin
+
+### Prometheus
+
+```bash
+kubectl port-forward -n monitoring svc/prometheus 9090:9090
+# Access at: http://localhost:9090
+```
+
+### MinIO
+
+```bash
+kubectl port-forward -n perf-platform svc/minio 9001:9001
+# Console: http://localhost:9001
+# Username: perfeng
+# Password: perfeng123
+```
+
 ### Node Labels
 
-| Node Type     | Label                                   | Purpose                      |
-| ------------- | --------------------------------------- | ---------------------------- |
-| Control Plane | `node-role.kubernetes.io/control-plane` | Kubernetes control plane     |
-| Generator     | `workload=performance-generator`        | Runs k6/Playwright test jobs |
-| SUT           | `workload=sut`                          | Runs system under test       |
+| Node          | Label                            | Purpose                  |
+|---------------|----------------------------------|--------------------------|
+| Control Plane | `workload=control-plane`         | Kubernetes control plane |
+| Worker 1      | `workload=performance-generator` | k6 test generator pods   |
+| Worker 2      | `workload=sut`                   | System under test        |
 
-### Node Labels (Repeated Configuration)
+### Namespaces
 
-| Node Type     | Label                                   | Purpose                      |
-| ------------- | --------------------------------------- | ---------------------------- |
-| Control Plane | `node-role.kubernetes.io/control-plane` | Kubernetes control plane     |
-| Generator     | `workload=performance-generator`        | Runs k6/Playwright test jobs |
-| SUT           | `workload=sut`                          | Runs system under test       |
+| Namespace         | Purpose                           |
+|-------------------|-----------------------------------|
+| `perf-platform`   | Platform orchestration components |
+| `perf-generators` | Test generator pods (k6)          |
+| `perf-sut`        | System under test                 |
+| `monitoring`      | Prometheus, Grafana, exporters    |
 
-### Node Taints
+### Helm Charts
 
-| Node Type | Taint                                       | Effect                      |
-| --------- | ------------------------------------------- | --------------------------- |
-| Generator | `workload=performance-generator:NoSchedule` | Prevents non-generator pods |
-| SUT       | `workload=sut:NoSchedule`                   | Prevents non-SUT pods       |
+| Chart           | Purpose                             |
+|-----------------|-------------------------------------|
+| `perfeng-infra` | Full infrastructure (10 sub-charts) |
+| `sample-sut`    | Sample System Under Test            |
+| `k6-runner`     | k6 test execution                   |
 
-### Verification
 
-After cluster creation, verify:
+## Troubleshooting
+
+### Cluster creation fails
 
 ```bash
-# Check nodes
-kubectl get nodes -o wide
+# Check Docker is running
+docker info
 
-# Check labels
-kubectl get nodes --show-labels
+# Delete and recreate
+make cluster-down
+make cluster-up
+```
 
-# Check taints
+### Helm install fails
+
+```bash
+# Check what's installed
+helm list --all-namespaces
+
+# Check for orphaned resources
+kubectl get all --all-namespaces | grep perfeng
+
+# Clean up and retry
+helm uninstall perfeng-infra
+kubectl delete namespace perf-platform --force --grace-period=0
+kubectl delete namespace perf-generators --force --grace-period=0
+kubectl delete namespace perf-sut --force --grace-period=0
+kubectl delete namespace monitoring --force --grace-period=0
+make infra-install
+```
+
+### PVC not binding
+
+```bash
+# Check PVC status
+kubectl get pvc --all-namespaces
+
+# Check storage class
+kubectl get storageclass
+
+# Check local-path provisioner
+kubectl get pods -n local-path-storage
+kubectl logs -n local-path-storage -l app=local-path-provisioner --tail=50
+```
+
+### Pod can't schedule
+
+```bash
+# Check pod events
+kubectl describe pod -n <namespace> <pod-name>
+
+# Check node taints
 kubectl get nodes -o custom-columns=NAME:.metadata.name,TAINTS:.spec.taints
 
-# Check metrics-server
-kubectl top nodes
+# Check resource quotas
+kubectl get resourcequota -n <namespace>
+kubectl describe limitrange -n <namespace>
 ```
 
-### Troubleshooting
-
-#### Cluster creation fails
-
-Check Docker is running:
-
+### k6 test fails
 ```bash
-docker info
+# Check if SUT is running
+kubectl get pods -n perf-sut
+
+# Check k6 pod logs
+kubectl logs -n perf-generators -l app=k6-test --tail=100
+
+# Check network connectivity
+kubectl run test-pod -n perf-generators --rm -it --image=busybox -- wget -qO- http://perf-sut-service.perf-sut:8080/
 ```
 
-#### metrics-server not working
-
-Check pod status:
+## Complete Workflow Example
 
 ```bash
-kubectl get pods -n kube-system -l k8s-app=metrics-server
-kubectl logs -n kube-system -l k8s-app=metrics-server
-```
-
-#### Cannot connect to cluster
-
-Check kubeconfig:
-
-```bash
-kind get kubeconfig --name perfeng-local
-kubectl config current-context
-```
-
-## Step 9: Run Setup
-
-```bash
-# From repository root
-cd /path/to/perfeng
-
-# Create cluster
+# 1. Start cluster
 make cluster-up
 
-# Install metrics-server
-make install-metrics
+# 2. Install infrastructure
+make infra-install
 
-# Check status
-make cluster-status
+# 3. Verify infrastructure
+make infra-status
 
-# Run health check
-make cluster-health
+# 4. Install sample SUT
+make sut-install
+
+# 5. Build k6 image
+make k6-build-image
+
+# 6. Run smoke test
+make k6-search-smoke
+
+# 7. Check results
+make k6-list
+kubectl get jobs -n perf-generators
+kubectl logs -n perf-generators -l app=k6-test --tail=50
+
+# 8. Clean up
+make k6-uninstall TEST=search PROFILE=smoke
+make sut-uninstall
+make infra-uninstall
+make cluster-down
 ```
 
-### Expected Output
+## See also
 
-After successful setup, you should see:
-
-Cluster nodes:
-
-````text
-NAME STATUS ROLES AGE VERSION
-perfeng-local-control-plane Ready control-plane 1m v1.28.0
-perfeng-local-worker Ready <none> 1m v1.28.0
-perfeng-local-worker2 Ready <none> 1m v1.28.0
-```
-
-Node labels:
-
-```text
-perfeng-local-control-plane: workload=control-plane
-perfeng-local-worker: workload=performance-generator, perfeng.io/node-type=generator
-perfeng-local-worker2: workload=sut, perfeng.io/node-type=sut
-```
-````
+- [Monitoring Stack Documentation](monitoring-stack.md)
+- [Metric Naming Conventions](architecture/metric-naming.md)
+- [Schema Versioning](architecture/schema-versioning.md)
