@@ -51,19 +51,10 @@ clean: ## Clean build artifacts
 	rm -rf artifacts/
 	@echo "Clean complete!"
 
-# --- k6 Test ---
-.PHONY: k6-smoke k6-regression
-
-k6-smoke: ## Run k6 smoke test
-	cd tests/k6 && k6 run --config ../../workloads/smoke/checkout.yaml checkout/scenario.js
-
-k6-regression: ## Run k6 regression test
-	cd tests/k6 && k6 run --config ../../workloads/regression/checkout.yaml checkout/scenario.js
-
 # --- k8s Infrastructure ---
-.PHONY: cluster-up cluster-down cluster-status cluster-health install-metrics install-namespaces
+.PHONY: cluster-up cluster-down infra-install infra-upgrade infra-uninstall
 
-# Detect OS and set appropriate script runner
+# Detect OS for script execution
 ifeq ($(OS),Windows_NT)
     SCRIPT_RUNNER = powershell -ExecutionPolicy Bypass -File
     SCRIPT_EXT = .ps1
@@ -84,42 +75,63 @@ cluster-status: ## Show cluster status
 cluster-health: ## Run cluster health check
 	$(SCRIPT_RUNNER) infra/local/scripts/cluster-health-check$(SCRIPT_EXT)
 
-install-metrics: ## Install metrics-server
-	$(SCRIPT_RUNNER) infra/local/scripts/install-metrics-server$(SCRIPT_EXT)
+infra-install: ## Install infrastructure via Helm
+	helm dependency update infra/charts/perfeng-infra
+	helm install perfeng-infra infra/charts/perfeng-infra --wait --timeout 10m
 
-install-namespaces: ## Install perfeng namespaces and RBAC
-	$(SCRIPT_RUNNER) infra/local/scripts/install-namespaces$(SCRIPT_EXT)
+infra-upgrade: ## Upgrade infrastructure
+	helm dependency update infra/charts/perfeng-infra
+	helm upgrade perfeng-infra infra/charts/perfeng-infra --wait --timeout 10m
 
-# --- Monitoring ---
-.PHONY: monitoring-up monitoring-down
-
-monitoring-up: ## Install monitoring stack
-	$(SCRIPT_RUNNER) infra/local/scripts/install-monitoring$(SCRIPT_EXT)
-
-monitoring-down: ## Uninstall monitoring stack
-	$(SCRIPT_RUNNER) infra/local/scripts/uninstall-monitoring$(SCRIPT_EXT)
-
-
-# --- k6 Infrastructure ---
-.PHONY: install-minio
-
-install-minio: ## Install MinIO for artifact storage
-	$(SCRIPT_RUNNER) infra/local/scripts/install-minio$(SCRIPT_EXT)
+infra-uninstall: ## Uninstall infrastructure
+	helm uninstall perfeng-infra
 
 # --- k6 Tests ---
-.PHONY: run-k6-smoke run-k6-regression run-k6-test
+.PHONY: sut-install sut-uninstall sut-status k6-test k6-smoke k6-search-smoke k6-account-smoke k6-regression k6-build-image k6-uninstall k6-list perf-test perf-smoke
 
-ifeq ($(OS),Windows_NT)
-    RUN_K6 = powershell -ExecutionPolicy Bypass -File infra/local/kind/k6-jobs/scripts/run-k6-test.ps1
-else
-    RUN_K6 = bash infra/local/kind/k6-jobs/scripts/run-k6-test.sh
-endif
+# SUT (System Under Test)
+sut-install: ## Install sample SUT
+	helm upgrade --install sample-sut infra/charts/sample-sut --namespace perf-sut --wait --timeout 5m
 
-run-k6-smoke: ## Run k6 smoke test as Kubernetes job
-	$(RUN_K6) --test-name checkout --profile smoke
+sut-uninstall: ## Uninstall sample SUT
+	helm uninstall sample-sut -n perf-sut
 
-run-k6-regression: ## Run k6 regression test as Kubernetes job
-	$(RUN_K6) --test-name checkout --profile regression
+sut-status: ## Show SUT status
+	kubectl get pods -n perf-sut
+	kubectl get svc -n perf-sut
 
-run-k6-test: ## Run k6 test as Kubernetes job (usage: make run-k6-test TEST=checkout PROFILE=smoke)
-	$(RUN_K6) --test-name $(TEST) --profile $(PROFILE)
+# k6 Test Runner
+k6-build-image: ## Build and load k6 test Docker image
+	docker build -t perfeng-k6-tests:latest tests/k6
+	kind load docker-image perfeng-k6-tests:latest --name perfeng-local
+
+k6-smoke: k6-build-image ## Run k6 checkout smoke test
+	helm upgrade --install k6-checkout-smoke infra/charts/k6-runner --namespace perf-generators --set test.name=checkout --set test.profile=smoke --set sut.baseUrl="http://perf-sut-service.perf-sut:8080" --wait --timeout 15m
+
+k6-search-smoke: k6-build-image ## Run k6 search smoke test
+	helm upgrade --install k6-search-smoke infra/charts/k6-runner --namespace perf-generators --set test.name=search --set test.profile=smoke --set sut.baseUrl="http://perf-sut-service.perf-sut:8080" --wait --timeout 15m
+
+k6-account-smoke: k6-build-image ## Run k6 account smoke test
+	helm upgrade --install k6-account-smoke infra/charts/k6-runner --namespace perf-generators --set test.name=account --set test.profile=smoke --set sut.baseUrl="http://perf-sut-service.perf-sut:8080" --wait --timeout 15m
+
+k6-regression: k6-build-image ## Run k6 checkout regression test
+	helm upgrade --install k6-checkout-regression infra/charts/k6-runner --namespace perf-generators --set test.name=checkout --set test.profile=regression --set sut.baseUrl="http://perf-sut-service.perf-sut:8080" --wait --timeout 20m
+
+k6-test: k6-build-image ## Run k6 test (usage: make k6-test TEST=checkout PROFILE=smoke)
+	helm upgrade --install k6-$(TEST)-$(PROFILE) infra/charts/k6-runner --namespace perf-generators --set test.name=$(TEST) --set test.profile=$(PROFILE) --set sut.baseUrl="http://perf-sut-service.perf-sut:8080" --wait --timeout 20m
+
+k6-uninstall: ## Uninstall k6 test (usage: make k6-uninstall TEST=checkout PROFILE=smoke)
+	helm uninstall k6-$(TEST)-$(PROFILE) -n perf-generators
+
+k6-list: ## List k6 test releases
+	helm list -n perf-generators
+
+# Combined Targets
+perf-test: ## Install SUT and run test (usage: make perf-test TEST=search PROFILE=smoke)
+	sut-install k6-test 
+
+perf-smoke: ## Install SUT and run search smoke test
+	sut-install k6-search-smoke 
+
+perf-all-smoke: ## Install SUT and run all smoke tests 
+	sut-install k6-smoke k6-search-smoke k6-account-smoke

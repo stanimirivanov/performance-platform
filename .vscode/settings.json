@@ -10,6 +10,16 @@
     "source.fixAll": "explicit",
     "source.organizeImports": "explicit"
   },
+  "files.associations": {
+    "**/templates/**/*.yaml": "helm",
+    "**/templates/**/*.yml": "helm",
+    "**/templates/**/*.tpl": "helm",
+    "**/*.yaml.gotmpl": "helm",
+    "**/*.yml.gotmpl": "helm"
+  },
+  "[helm]": {
+    "editor.formatOnSave": false
+  },
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff",
     "editor.formatOnSave": true
