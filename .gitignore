@@ -52,8 +52,10 @@ coverage/
 # Playwright
 playwright-report/
 test-results/
-
 test-output
+
+# Infrastructure test
+/results/
 
 # Python
 __pycache__/
