@@ -5,7 +5,11 @@ Unit tests for the configuration loader.
 import os
 from unittest.mock import patch
 
+import pytest
+
 from perfeng.metadata.config_loader import ConfigLoader, create_collector_for_environment
+
+pytestmark = pytest.mark.metadata
 
 
 class TestConfigLoader:

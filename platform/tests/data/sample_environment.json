@@ -1,0 +1,30 @@
+{
+  "cluster": "test-cluster",
+  "fingerprint": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "kubernetes": {
+    "version": "v1.28.0",
+    "nodeCount": 3,
+    "nodePools": [
+      {
+        "name": "pool-1",
+        "nodeModel": "m5.xlarge",
+        "cpuArchitecture": "amd64",
+        "cpuCount": 4,
+        "memoryGiB": 16.0
+      }
+    ]
+  },
+  "runtime": {
+    "containerRuntime": "containerd",
+    "cni": "calico",
+    "storageClass": "gp3",
+    "kernel": "5.15.0"
+  },
+  "application": {
+    "configurationHash": "config123",
+    "featureFlags": {
+      "debug": true,
+      "trace": false
+    }
+  }
+}

@@ -10,6 +10,8 @@ from perfeng.generated.environment import EnvironmentSpecification
 from perfeng.metadata.collector import MetadataCollector
 from perfeng.metadata.config_loader import create_collector_for_environment
 
+pytestmark = pytest.mark.integration
+
 
 @pytest.mark.integration
 class TestMetadataFlow:
