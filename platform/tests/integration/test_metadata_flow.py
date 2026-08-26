@@ -10,8 +10,6 @@ from perfeng.generated.environment import EnvironmentSpecification
 from perfeng.metadata.collector import MetadataCollector
 from perfeng.metadata.config_loader import create_collector_for_environment
 
-pytestmark = pytest.mark.integration
-
 
 @pytest.mark.integration
 class TestMetadataFlow:
@@ -28,8 +26,14 @@ class TestMetadataFlow:
         assert isinstance(env, EnvironmentSpecification)
         assert env.cluster == "test-cluster"
         assert len(env.fingerprint) == 64
-        assert env.kubernetes is not None
-        assert env.runtime is not None
+
+        # Check kubernetes is not None before accessing attributes
+        assert env.kubernetes is not None, "Kubernetes info should be present"
+        assert env.runtime is not None, "Runtime info should be present"
+
+        # Now safe to access attributes
+        assert env.kubernetes.version == "v1.28.0"
+        assert env.kubernetes.node_count == 3
 
         # Collect test metadata
         metadata = collector.collect_test_metadata(
@@ -57,7 +61,14 @@ class TestMetadataFlow:
         # Verify roundtrip
         assert env2.cluster == env.cluster
         assert env2.fingerprint == env.fingerprint
-        assert env2.kubernetes.version == env.kubernetes.version
+
+        # kubernetes may be None; handle accordingly
+        if env.kubernetes is not None:
+            assert env2.kubernetes is not None
+            assert env2.kubernetes.version == env.kubernetes.version
+            assert env2.kubernetes.node_count == env.kubernetes.node_count
+        else:
+            assert env2.kubernetes is None
 
     def test_environment_comparison(self):
         """Test comparing different environments."""
@@ -81,11 +92,11 @@ class TestMetadataFlow:
             "run_id": "perf-20240115-143022-ab12cd34",
             "environment": {
                 "cluster": env.cluster,
-                "kubernetes_version": env.kubernetes.version if env.kubernetes else None,
-                "node_count": env.kubernetes.node_count if env.kubernetes else 1,
+                "kubernetes_version": (env.kubernetes.version if env.kubernetes else None),
+                "node_count": (env.kubernetes.node_count if env.kubernetes else 1),
                 "fingerprint": env.fingerprint,
                 "runtime": {
-                    "container_runtime": env.runtime.container_runtime if env.runtime else None,
+                    "container_runtime": (env.runtime.container_runtime if env.runtime else None),
                     "cni": env.runtime.cni if env.runtime else None,
                     "kernel": env.runtime.kernel if env.runtime else None,
                 },

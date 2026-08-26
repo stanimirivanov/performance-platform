@@ -5,6 +5,7 @@ Metadata-specific fixtures.
 
 import json
 import tempfile
+from collections.abc import Generator
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -15,7 +16,7 @@ from perfeng.metadata.collector import MetadataCollector
 
 
 @pytest.fixture
-def temp_config_file() -> Path:
+def temp_config_file() -> Generator[Path, None, None]:
     """Create a temporary configuration file."""
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         config = {
@@ -44,7 +45,7 @@ def temp_config_file() -> Path:
 
 
 @pytest.fixture
-def mock_subprocess() -> Mock:
+def mock_subprocess() -> Generator[Mock, None, None]:
     """Mock subprocess.run for testing."""
     with patch("subprocess.run") as mock_run:
         # Default successful responses
@@ -65,7 +66,7 @@ def collector() -> MetadataCollector:
 
 
 @pytest.fixture
-def collector_with_config(temp_config_file) -> MetadataCollector:
+def collector_with_config(temp_config_file: Path) -> MetadataCollector:
     """Create a collector with configuration."""
     return MetadataCollector(temp_config_file)
 
@@ -109,7 +110,7 @@ def sample_test_metadata() -> dict:
 
 
 @pytest.fixture
-def mock_kubectl_available() -> Mock:
+def mock_kubectl_available() -> Generator[Mock, None, None]:
     """Mock kubectl as available."""
     with patch("subprocess.run") as mock_run:
 
@@ -139,7 +140,7 @@ def mock_kubectl_available() -> Mock:
 
 
 @pytest.fixture
-def mock_kubectl_not_available() -> Mock:
+def mock_kubectl_not_available() -> Generator[Mock, None, None]:
     """Mock kubectl as not available."""
     with patch("subprocess.run") as mock_run:
         mock_run.side_effect = FileNotFoundError("kubectl not found")

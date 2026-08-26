@@ -3,6 +3,7 @@ Global fixtures shared across all test groups.
 """
 
 import tempfile
+from collections.abc import Generator
 from pathlib import Path
 
 import pytest
@@ -21,7 +22,7 @@ def examples_dir() -> Path:
 
 
 @pytest.fixture
-def temp_dir() -> Path:
+def temp_dir() -> Generator[Path, None, None]:
     """Create a temporary directory."""
     with tempfile.TemporaryDirectory() as tmpdir:
         yield Path(tmpdir)

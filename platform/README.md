@@ -44,42 +44,42 @@ pytest tests/metadata/test_collector.py::TestMetadataCollector::test_init_defaul
 # By Group
 
 # Metadata only
-pytest tests/metadata/ -v
+uv run pytest tests/metadata/ -v
 
 # Normalization only
-pytest tests/normalization/ -v
+uv run pytest tests/normalization/ -v
 
 # Core only
-pytest tests/core/ -v
+uv run pytest tests/core/ -v
 
 # Integration only
-pytest tests/integration/ -v
+uv run pytest tests/integration/ -v
 ```
 
 `````bash
 # By Marker
 
 # All unit tests
-pytest tests/ -m unit -v
+uv run pytest tests/ -m unit -v
 
 # All integration tests
-pytest tests/ -m integration -v
+uv run pytest tests/ -m integration -v
 
 # Metadata unit tests only
-pytest tests/ -m "metadata and unit" -v
+uv run pytest tests/ -m "metadata and unit" -v
 
 # Fast tests (excludes integration, slow, kubectl)
-pytest tests/ -m "not integration and not slow and not requires_kubectl" -v
+uv run pytest tests/ -m "not integration and not slow and not requires_kubectl" -v
 ```
 
 
 ```bash
 # With Coverage
 # All tests with coverage
-pytest tests/ --cov=perfeng --cov-report=html --cov-report=term
+uv run pytest tests/ --cov=perfeng --cov-report=html --cov-report=term
 
 # Metadata only with coverage
-pytest tests/metadata/ --cov=perfeng.metadata --cov-report=term
+uv run pytest tests/metadata/ --cov=perfeng.metadata --cov-report=term
 ```
 
 **Test Coverage Requirements**

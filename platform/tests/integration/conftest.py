@@ -4,11 +4,13 @@ These fixtures may set up external dependencies like test databases,
 API clients, or real environment connections.
 """
 
+import contextlib
 import subprocess
 import time
 from collections.abc import Generator
 from typing import Any
 
+import docker
 import pytest
 
 from perfeng.metadata.collector import MetadataCollector
@@ -19,12 +21,14 @@ from perfeng.metadata.config_loader import create_collector_for_environment
 def test_postgres_container() -> Generator[dict[str, Any], None, None]:
     """
     Start a temporary PostgreSQL container for integration tests.
-    Requires Docker to be installed.
+    Requires Docker and the 'docker' Python package.
     """
-    import docker
-    from docker.errors import NotFound
 
-    client = docker.from_env()
+    try:
+        client = docker.from_env()  # type: ignore
+    except Exception as e:
+        pytest.skip(f"Docker not available: {e}")
+
     container_name = "perfeng_test_postgres"
 
     # Clean up any existing container with the same name
@@ -32,7 +36,7 @@ def test_postgres_container() -> Generator[dict[str, Any], None, None]:
         existing = client.containers.get(container_name)
         existing.stop()
         existing.remove()
-    except NotFound:
+    except docker.errors.NotFound:  # type: ignore
         pass
 
     # Run PostgreSQL container
@@ -49,13 +53,20 @@ def test_postgres_container() -> Generator[dict[str, Any], None, None]:
         remove=True,
     )
 
-    # Get host port
+    # Get host port safely
     container.reload()
-    host_port = container.ports["5432/tcp"][0]["HostPort"]
+    port_mapping = container.ports.get("5432/tcp")
+    if not port_mapping:
+        # Cleanup and skip
+        container.stop()
+        pytest.skip("Could not get port mapping for PostgreSQL container")
+
+    # port_mapping is a list of dicts with HostPort
+    host_port = port_mapping[0]["HostPort"]
 
     # Wait for PostgreSQL to be ready
     max_attempts = 30
-    for attempt in range(max_attempts):
+    for _attempt in range(max_attempts):
         try:
             subprocess.run(
                 [
@@ -92,18 +103,14 @@ def test_postgres_container() -> Generator[dict[str, Any], None, None]:
     yield connection_info
 
     # Cleanup
-    try:
+    with contextlib.suppress(Exception):
         container.stop()
-    except Exception:
-        pass
 
 
 @pytest.fixture
 def integration_collector() -> MetadataCollector:
     """Return a collector configured for integration tests (using test config)."""
-    # Use a configuration that points to a test environment
-    collector = create_collector_for_environment("test")
-    return collector
+    return create_collector_for_environment("test")
 
 
 @pytest.fixture
