@@ -30,11 +30,11 @@ def collect_metadata_demo():
     env_dict = {
         "cluster": env.cluster,
         "kubernetesVersion": env.kubernetes.version if env.kubernetes else None,
-        "nodeCount": env.kubernetes.node_count if env.kubernetes else 1,
+        "nodeCount": env.kubernetes.nodeCount if env.kubernetes else 1,
         "kernel": env.runtime.kernel if env.runtime else None,
-        "containerRuntime": env.runtime.container_runtime if env.runtime else None,
+        "containerRuntime": env.runtime.containerRuntime if env.runtime else None,
         "cni": env.runtime.cni if env.runtime else None,
-        "storageClass": env.runtime.storage_class if env.runtime else None,
+        "storageClass": env.runtime.storageClass if env.runtime else None,
         "fingerprint": env.fingerprint,
     }
 
@@ -113,10 +113,10 @@ def demo_collect_from_environment():
 
     if env.kubernetes:
         print(f"Kubernetes Version: {env.kubernetes.version}")
-        print(f"Node Count: {env.kubernetes.node_count}")
+        print(f"Node Count: {env.kubernetes.nodeCount}")
 
     if env.runtime:
-        print(f"Container Runtime: {env.runtime.container_runtime}")
+        print(f"Container Runtime: {env.runtime.containerRuntime}")
         print(f"CNI: {env.runtime.cni}")
         print(f"Kernel: {env.runtime.kernel}")
 

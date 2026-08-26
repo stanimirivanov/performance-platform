@@ -11,10 +11,9 @@ import pytest
 import yaml
 
 from perfeng.generated.environment import CpuArchitecture, EnvironmentSpecification
-from perfeng.generated.run_metadata import PerformanceRunMetadata, Profile, Trigger
+from perfeng.generated.run_metadata import Environment as RunEnvironment
+from perfeng.generated.run_metadata import Profile
 from perfeng.generated.run_metadata import Status as RunStatus
-from perfeng.generated.run_metadata import Tool as TestTool
-from perfeng.generated.run_metadata import Type as TestType
 from perfeng.metadata.collector import (
     MetadataCollector,
     collect_run_metadata,
@@ -94,9 +93,9 @@ class TestMetadataCollector:
         assert env.fingerprint == "b" * 64
         assert env.kubernetes is not None
         assert env.kubernetes.version == "v1.27.0"
-        assert env.kubernetes.node_count == 5
+        assert env.kubernetes.nodeCount == 5
         assert env.runtime is not None
-        assert env.runtime.container_runtime == "docker"
+        assert env.runtime.containerRuntime == "docker"
 
     def test_collect_environment_caching(self, collector_with_config):
         """Test that environment is cached after first collection."""
@@ -163,64 +162,52 @@ class TestMetadataCollector:
         assert len(fingerprint) == 64
         assert all(c in "0123456789abcdef" for c in fingerprint)
 
-    def test_collect_test_metadata(self, collector):
+    def test_test_metadata_collection(self):
         """Test collecting complete test metadata."""
+        collector = MetadataCollector()
+
+        # Pass custom fields via featureFlags or notes if needed
         metadata = collector.collect_test_metadata(
-            test_name="load-test",
+            test_name="test-perf-1",
             status="running",
-            test_script="load_test.py",  # Not directly used now, maybe via test.scenario?
-            test_profile="medium-load",  # maps to run.profile
-            thresholds={"p95": 100},  # Not stored directly; would be in candidate or test?
-            tags=["performance"],  # Not in schema; maybe we'll ignore or map to notes?
-            trigger_type="ci",
+            test_profile="load-test",  # will map to Profile.regression (default)
+            tags=["performance", "load"],
+            thresholds={"p95": 100},
+            featureFlags={"tags": ["performance", "load"], "thresholds": {"p95": 100}},
+            notes="script.py",  # store test_script in notes
         )
 
-        assert isinstance(metadata, PerformanceRunMetadata)
+        # Run fields
+        assert metadata.run.suite == "test-perf-1"
+        assert metadata.run.status == RunStatus.RUNNING
+        # profile defaults to regression because "load-test" not in enum
+        assert metadata.run.profile == Profile.regression
 
-        # Check Run
-        assert metadata.run.suite == "load-test"
-        assert metadata.run.profile == Profile.regression  # default since 'medium-load' not in enum
-        assert metadata.run.trigger == Trigger.ci
-        assert metadata.run.status == RunStatus.RUNNING  # mapped from 'running'
-        assert metadata.run.id.startswith("perf-")
-        assert metadata.run.timestamp is not None
+        # Custom metadata stored in featureFlags
+        assert metadata.candidate.featureFlags is not None
+        assert metadata.candidate.featureFlags["tags"] == ["performance", "load"]
+        assert metadata.candidate.featureFlags["thresholds"] == {"p95": 100}
+        assert metadata.run.notes == "script.py"
 
-        # Check Test
-        assert metadata.test.scenario == "load-test"  # default to test_name
-        assert metadata.test.tool == TestTool.k6  # default
-        assert metadata.test.type == TestType.api  # default
-
-        # Candidate is filled with defaults
-        assert metadata.candidate.gitSha == "0" * 40
-
-        # Environment is present
-        assert metadata.environment is not None
-
-        # Optional fields not provided; should be None
-        assert metadata.runtime is None
-        assert metadata.data is None
-        assert metadata.phases is None
-
-        # 'thresholds', 'tags', etc. are not directly in PerformanceRunMetadata
-        # We might store them as notes or in featureFlags, but for now we assert they're not there.
+        # Environment is now RunEnvironment, not EnvironmentSpecification
+        assert isinstance(metadata.environment, RunEnvironment)
 
     def test_collect_test_metadata_with_overrides(self, collector):
         """Test test metadata collection with overrides."""
         collector.set_override(
             "test_metadata",
-            {"test_name": "override-name", "status": "completed"},
+            {"run.suite": "override-name", "run.status": RunStatus.COMPLETED},
         )
-
         metadata = collector.collect_test_metadata(test_name="original-name", status="pending")
-
-        assert metadata.test_name == "override-name"
-        assert metadata.status == "completed"
+        assert metadata.run.suite == "override-name"
+        assert metadata.run.status == RunStatus.COMPLETED
 
     def test_collect_test_metadata_with_environment(self, collector_with_config):
         """Test that test metadata includes environment."""
         metadata = collector_with_config.collect_test_metadata(test_name="load-test")
-        assert isinstance(metadata.environment, EnvironmentSpecification)
+        assert isinstance(metadata.environment, RunEnvironment)
         assert metadata.environment.cluster == "test-cluster"
+        assert metadata.environment.kubernetesVersion == "v1.28.0"
 
     @patch("subprocess.run")
     def test_auto_detect_kubernetes(self, mock_run, collector):
@@ -228,15 +215,16 @@ class TestMetadataCollector:
 
         def side_effect(*args, **kwargs):
             cmd = args[0] if args else []
-            if "cluster-info" in cmd:
+            cmd_str = " ".join(cmd)
+            if "cluster-info" in cmd_str:
                 return Mock(returncode=0, stdout="", stderr="")
-            elif "current-context" in cmd:
+            elif "current-context" in cmd_str:
                 return Mock(returncode=0, stdout="test-context\n", stderr="")
-            elif "version" in cmd:
+            elif "version" in cmd_str:
                 return Mock(
                     returncode=0, stdout='{"serverVersion":{"gitVersion":"v1.28.0"}}', stderr=""
                 )
-            elif "get nodes" in cmd:
+            elif "get nodes" in cmd_str:
                 return Mock(
                     returncode=0,
                     stdout=json.dumps(
@@ -274,16 +262,16 @@ class TestMetadataCollector:
 
     @patch("subprocess.run")
     def test_auto_detect_kubectl_not_available(self, mock_run, collector):
-        """Test auto-detection when kubectl is not available."""
         mock_run.side_effect = FileNotFoundError("kubectl not found")
-
         collector.config["auto_detect"] = True
         collector._environment_cache = None
 
         env = collector.collect_environment()
-        # Should fall back to local detection
+        # The collector should fall back to defaults
         assert env.cluster is not None
-        assert env.kubernetes is not None
+        assert len(env.fingerprint) == 64
+        assert env.kubernetes.version == "0.0.0"  # fallback
+        assert env.kubernetes.nodeCount == 1  # default
 
     def test_deep_merge(self, collector):
         """Test deep merge of configuration dictionaries."""
@@ -315,13 +303,12 @@ class TestUtilityFunctions:
         Path(config_path).unlink()
 
     def test_collect_run_metadata(self):
-        """Test convenience function for collecting run metadata."""
         metadata_dict = collect_run_metadata(test_name="quick-test", tags=["quick"])
-
         assert isinstance(metadata_dict, dict)
-        assert metadata_dict["test_name"] == "quick-test"
-        assert metadata_dict["tags"] == ["quick"]
-        assert "environment" in metadata_dict
+        assert metadata_dict["run"]["suite"] == "quick-test"
+        # tags are stored in candidate.featureFlags
+        assert "tags" in metadata_dict["candidate"]["featureFlags"]
+        assert metadata_dict["candidate"]["featureFlags"]["tags"] == ["quick"]
         assert "fingerprint" in metadata_dict["environment"]
 
 

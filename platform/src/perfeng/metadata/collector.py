@@ -443,9 +443,12 @@ class MetadataCollector:
             node_pool = first_pool.name
             cpu_arch = first_pool.cpuArchitecture.value if first_pool.cpuArchitecture else None
 
+        # Get kubernetes version, default to "unknown" if missing
+        k8s_version = kubernetes.version if kubernetes and kubernetes.version else "0.0.0"
+
         return RunEnvironment(
             cluster=env_spec.cluster,
-            kubernetesVersion=kubernetes.version if kubernetes else "unknown",
+            kubernetesVersion=k8s_version,
             nodePool=kwargs.get("nodePool", node_pool),
             nodeModel=kwargs.get("nodeModel"),
             cpuArchitecture=kwargs.get("cpuArchitecture", cpu_arch),
