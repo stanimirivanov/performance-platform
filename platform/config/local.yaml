@@ -1,0 +1,24 @@
+# Local development environment
+
+auto_detect: true
+timeout_seconds: 30
+
+environment_config:
+  cluster: 'local-dev'
+  kubernetes:
+    version: 'v1.28.0'
+    nodeCount: 1
+  runtime:
+    containerRuntime: 'docker'
+    cni: 'bridge'
+    storageClass: 'local-path'
+    kernel: null
+  application:
+    configurationHash: null
+    feature_flags:
+      debug: true
+      trace: true
+
+fingerprint_excludes:
+  - 'local-dev'
+  - 'test'

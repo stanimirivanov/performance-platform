@@ -1,5 +1,4 @@
-# Local development environment for metadata service
-
+# docker-compose.metadata.yaml
 version: '3.8'
 
 services:
@@ -26,23 +25,29 @@ services:
 
   metadata-api:
     build:
-      context: .
-      dockerfile: Dockerfile.metadata
+      context: ./platform
+      dockerfile: Dockerfile
     container_name: metadata-api
     environment:
       DATABASE_URL: postgresql://test_user:test_password@postgres:5432/metadata
       API_PORT: 8000
+      PERFENG_CONFIG: /app/config/environment.yaml
+      # Auto-detect settings
+      PERFENG_AUTO_DETECT: 'true'
+      PERFENG_CLUSTER_NAME: 'perfeng-runner'
+      PERFENG_CLUSTER_TYPE: 'k8s'
     ports:
       - '8000:8000'
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
-      - ./platform/api:/app/api
-      - ./platform/metadata:/app/metadata
+      - ./platform/src:/app/src
+      - ./platform/config:/app/config
+      - ~/.kube:/root/.kube:ro # Mount kubeconfig for auto-detection
     networks:
       - metadata-network
-    command: uvicorn api.metadata_service:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn perfeng.api.metadata_service:app --host 0.0.0.0 --port 8000 --reload
 
   pgadmin:
     image: dpage/pgadmin4:latest
