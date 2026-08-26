@@ -238,6 +238,13 @@ class MetadataCollector:
             configHash=kwargs.get("configHash"),
         )
 
+        # Build featureFlags
+        feature_flags = kwargs.get("featureFlags", {})
+        if "tags" in kwargs:
+            feature_flags["tags"] = kwargs["tags"]
+        if "thresholds" in kwargs:
+            feature_flags["thresholds"] = kwargs["thresholds"]
+
         # 8. Build Candidate
         candidate = Candidate(
             gitSha=kwargs.get("gitSha", "0" * 40),
@@ -245,7 +252,7 @@ class MetadataCollector:
             version=kwargs.get("version"),
             branch=kwargs.get("branch"),
             configurationHash=kwargs.get("configurationHash"),
-            featureFlags=kwargs.get("featureFlags"),
+            featureFlags=feature_flags if feature_flags else None,
             databaseMigrationVersion=kwargs.get("databaseMigrationVersion"),
         )
 
@@ -320,14 +327,18 @@ class MetadataCollector:
             phases=phases,
         )
 
-        # 13. Apply overrides (simple flat override for top-level fields)
+        # 13. Apply overrides (support dotted notation)
         if "test_metadata" in self.override_values:
             override = self.override_values["test_metadata"]
-            # We only support a limited set of overrides at the top level.
-            # For advanced usage, users should build the metadata themselves.
             for key, value in override.items():
-                if hasattr(metadata, key):
-                    setattr(metadata, key, value)
+                parts = key.split(".")
+                obj = metadata
+                for part in parts[:-1]:
+                    obj = getattr(obj, part, None)
+                    if obj is None:
+                        break
+                else:
+                    setattr(obj, parts[-1], value)
 
         return metadata
 

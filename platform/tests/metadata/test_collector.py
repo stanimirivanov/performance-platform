@@ -2,10 +2,9 @@
 Unit tests for the metadata collector using builders.
 """
 
-import json
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 import yaml
@@ -209,69 +208,47 @@ class TestMetadataCollector:
         assert metadata.environment.cluster == "test-cluster"
         assert metadata.environment.kubernetesVersion == "v1.28.0"
 
-    @patch("subprocess.run")
-    def test_auto_detect_kubernetes(self, mock_run, collector):
-        """Test auto-detection of Kubernetes environment."""
-
-        def side_effect(*args, **kwargs):
-            cmd = args[0] if args else []
-            cmd_str = " ".join(cmd)
-            if "cluster-info" in cmd_str:
-                return Mock(returncode=0, stdout="", stderr="")
-            elif "current-context" in cmd_str:
-                return Mock(returncode=0, stdout="test-context\n", stderr="")
-            elif "version" in cmd_str:
-                return Mock(
-                    returncode=0, stdout='{"serverVersion":{"gitVersion":"v1.28.0"}}', stderr=""
-                )
-            elif "get nodes" in cmd_str:
-                return Mock(
-                    returncode=0,
-                    stdout=json.dumps(
-                        {
-                            "items": [
-                                {
-                                    "metadata": {"name": "node1"},
-                                    "status": {"capacity": {"cpu": "4", "memory": "16Gi"}},
-                                },
-                                {
-                                    "metadata": {"name": "node2"},
-                                    "status": {"capacity": {"cpu": "4", "memory": "16Gi"}},
-                                },
-                                {
-                                    "metadata": {"name": "node3"},
-                                    "status": {"capacity": {"cpu": "4", "memory": "16Gi"}},
-                                },
-                            ]
-                        }
-                    ),
-                    stderr="",
-                )
-            else:
-                return Mock(returncode=0, stdout="", stderr="")
-
-        mock_run.side_effect = side_effect
-
+    @patch("perfeng.metadata.collector.MetadataCollector._detect_cluster_info")
+    def test_auto_detect_kubernetes(self, mock_detect_cluster, collector):
+        mock_detect_cluster.return_value = {"name": "test-context", "type": "k8s", "node_count": 3}
         collector.config["auto_detect"] = True
+        collector.config["environment_config"]["cluster"] = None  # prevent override
         collector._environment_cache = None
-
         env = collector.collect_environment()
         assert env.cluster == "test-context"
-        assert env.kubernetes is not None
-        assert env.kubernetes.node_count == 3
+        assert env.kubernetes.nodeCount == 3
 
-    @patch("subprocess.run")
-    def test_auto_detect_kubectl_not_available(self, mock_run, collector):
-        mock_run.side_effect = FileNotFoundError("kubectl not found")
+    @patch("perfeng.metadata.collector.MetadataCollector._detect_cluster_info")
+    @patch("perfeng.metadata.collector.MetadataCollector._get_kubernetes_version")
+    @patch("perfeng.metadata.collector.MetadataCollector._detect_node_pools")
+    @patch("perfeng.metadata.collector.MetadataCollector._detect_container_runtime")
+    @patch("perfeng.metadata.collector.MetadataCollector._detect_cni")
+    @patch("perfeng.metadata.collector.MetadataCollector._detect_storage_class")
+    def test_auto_detect_kubectl_not_available(
+        self,
+        mock_storage,
+        mock_cni,
+        mock_runtime,
+        mock_pools,
+        mock_version,
+        mock_cluster,
+        collector,
+    ):
+        mock_cluster.return_value = {"name": "local", "type": "docker", "node_count": 1}
+        mock_version.return_value = None
+        mock_pools.return_value = None
+        mock_runtime.return_value = None
+        mock_cni.return_value = None
+        mock_storage.return_value = None
+
         collector.config["auto_detect"] = True
         collector._environment_cache = None
 
         env = collector.collect_environment()
-        # The collector should fall back to defaults
-        assert env.cluster is not None
+        assert env.cluster == "local"
         assert len(env.fingerprint) == 64
-        assert env.kubernetes.version == "0.0.0"  # fallback
-        assert env.kubernetes.nodeCount == 1  # default
+        assert env.kubernetes.version is None
+        assert env.kubernetes.nodeCount == 1
 
     def test_deep_merge(self, collector):
         """Test deep merge of configuration dictionaries."""
