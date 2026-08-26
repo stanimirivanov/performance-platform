@@ -13,6 +13,9 @@ from perfeng.generated.environment import CpuArchitecture, EnvironmentSpecificat
 from perfeng.generated.run_metadata import Environment as RunEnvironment
 from perfeng.generated.run_metadata import Profile
 from perfeng.generated.run_metadata import Status as RunStatus
+from perfeng.metadata import config as cfg_module
+from perfeng.metadata import detectors
+from perfeng.metadata import fingerprint as fp_module
 from perfeng.metadata.collector import (
     MetadataCollector,
     collect_run_metadata,
@@ -103,23 +106,23 @@ class TestMetadataCollector:
         assert env1 is env2
 
     @patch("platform.system")
-    @patch("perfeng.metadata.collector.psutil")
-    def test_detect_node_info(self, mock_psutil, mock_platform, collector):
+    @patch("perfeng.metadata.detectors.psutil")
+    def test_detect_node_info(self, mock_psutil, mock_platform):
         """Test node information detection."""
         mock_platform.return_value = "Linux"
         mock_psutil.cpu_count.return_value = 8
         mock_psutil.virtual_memory.return_value.total = 16 * (1024**3)
         mock_psutil.disk_usage.return_value.total = 100 * (1024**3)
 
-        node_info = collector._detect_node_info()
+        node_info = detectors.detect_node_info()
 
         assert node_info["os"] == "Linux"
         assert node_info["resources"]["cpu_cores"] == 8
         assert node_info["resources"]["memory_total_gb"] == 16.0
 
-    def test_generate_fingerprint(self, collector):
+    def test_generate_fingerprint(self):
         """Test fingerprint generation."""
-        fingerprint = collector._generate_fingerprint(
+        fingerprint = fp_module.generate_fingerprint(
             cluster_name="test-cluster",
             k8s_version="v1.28.0",
             node_os="linux",
@@ -130,7 +133,7 @@ class TestMetadataCollector:
         assert all(c in "0123456789abcdef" for c in fingerprint)
 
         # Same inputs -> same fingerprint
-        fingerprint2 = collector._generate_fingerprint(
+        fingerprint2 = fp_module.generate_fingerprint(
             cluster_name="test-cluster",
             k8s_version="v1.28.0",
             node_os="linux",
@@ -139,7 +142,7 @@ class TestMetadataCollector:
         assert fingerprint == fingerprint2
 
         # Different inputs -> different fingerprint
-        fingerprint3 = collector._generate_fingerprint(
+        fingerprint3 = fp_module.generate_fingerprint(
             cluster_name="different-cluster",
             k8s_version="v1.28.0",
             node_os="linux",
@@ -147,15 +150,16 @@ class TestMetadataCollector:
         )
         assert fingerprint != fingerprint3
 
-    def test_generate_fingerprint_with_exclusions(self, collector):
+    def test_generate_fingerprint_with_exclusions(self):
         """Test fingerprint generation with exclusions."""
-        collector.config["fingerprint_excludes"] = ["test-cluster"]
+        excludes = ["test-cluster"]
 
-        fingerprint = collector._generate_fingerprint(
+        fingerprint = fp_module.generate_fingerprint(
             cluster_name="test-cluster",
             k8s_version="v1.28.0",
             node_os="linux",
             container_runtime="containerd",
+            excludes=excludes,
         )
 
         assert len(fingerprint) == 64
@@ -208,22 +212,46 @@ class TestMetadataCollector:
         assert metadata.environment.cluster == "test-cluster"
         assert metadata.environment.kubernetesVersion == "v1.28.0"
 
-    @patch("perfeng.metadata.collector.MetadataCollector._detect_cluster_info")
-    def test_auto_detect_kubernetes(self, mock_detect_cluster, collector):
-        mock_detect_cluster.return_value = {"name": "test-context", "type": "k8s", "node_count": 3}
+    @patch("perfeng.metadata.detectors.detect_cluster_info")
+    @patch("perfeng.metadata.detectors.get_kubernetes_version")
+    @patch("perfeng.metadata.detectors.detect_node_pools")
+    @patch("perfeng.metadata.detectors.detect_container_runtime")
+    @patch("perfeng.metadata.detectors.detect_cni")
+    @patch("perfeng.metadata.detectors.detect_storage_class")
+    def test_auto_detect_kubernetes(
+        self,
+        mock_storage,
+        mock_cni,
+        mock_runtime,
+        mock_pools,
+        mock_k8s_version,
+        mock_cluster_info,
+        collector,
+    ):
+        mock_cluster_info.return_value = {"name": "test-context", "type": "k8s", "node_count": 3}
+        mock_k8s_version.return_value = "v1.28.0"
+        mock_pools.return_value = None
+        mock_runtime.return_value = None
+        mock_cni.return_value = None
+        mock_storage.return_value = None
+
+        # Ensure config does not override detected values
+        collector.config["environment_config"]["cluster"] = None
+        collector.config["environment_config"]["kubernetes"] = {}
         collector.config["auto_detect"] = True
-        collector.config["environment_config"]["cluster"] = None  # prevent override
         collector._environment_cache = None
+
         env = collector.collect_environment()
         assert env.cluster == "test-context"
         assert env.kubernetes.nodeCount == 3
+        assert env.kubernetes.version == "v1.28.0"
 
-    @patch("perfeng.metadata.collector.MetadataCollector._detect_cluster_info")
-    @patch("perfeng.metadata.collector.MetadataCollector._get_kubernetes_version")
-    @patch("perfeng.metadata.collector.MetadataCollector._detect_node_pools")
-    @patch("perfeng.metadata.collector.MetadataCollector._detect_container_runtime")
-    @patch("perfeng.metadata.collector.MetadataCollector._detect_cni")
-    @patch("perfeng.metadata.collector.MetadataCollector._detect_storage_class")
+    @patch("perfeng.metadata.detectors.detect_cluster_info")
+    @patch("perfeng.metadata.detectors.get_kubernetes_version")
+    @patch("perfeng.metadata.detectors.detect_node_pools")
+    @patch("perfeng.metadata.detectors.detect_container_runtime")
+    @patch("perfeng.metadata.detectors.detect_cni")
+    @patch("perfeng.metadata.detectors.detect_storage_class")
     def test_auto_detect_kubectl_not_available(
         self,
         mock_storage,
@@ -255,7 +283,7 @@ class TestMetadataCollector:
         base = {"a": 1, "b": {"c": 2, "d": 3}}
         override = {"b": {"c": 4}, "e": 5}
 
-        result = collector._deep_merge(base, override)
+        result = cfg_module.deep_merge(base, override)
         assert result["a"] == 1
         assert result["b"]["c"] == 4
         assert result["b"]["d"] == 3
