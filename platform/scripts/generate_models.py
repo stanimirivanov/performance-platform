@@ -60,7 +60,7 @@ def generate_models() -> None:
             use_standard_collections=True,
             use_union_operator=True,
             field_constraints=True,
-            snake_case_field=True,
+            snake_case_field=False,
             strip_default_none=True,
             use_annotated=True,
             use_field_description=True,

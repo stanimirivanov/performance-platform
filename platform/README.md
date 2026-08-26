@@ -28,16 +28,16 @@ uv run perfeng --help
 
 ```bash
 # Run all tests
-pytest tests/
+uv run pytest tests/
 
 # Run with verbose output
-pytest tests/ -v
+uv run pytest tests/ -v
 
 # Run specific test file
-pytest tests/metadata/test_collector.py -v
+uv run pytest tests/metadata/test_collector.py -v
 
 # Run specific test
-pytest tests/metadata/test_collector.py::TestMetadataCollector::test_init_default -v
+uv run pytest tests/metadata/test_collector.py::TestMetadataCollector::test_init_default -v
 ```
 
 ```bash

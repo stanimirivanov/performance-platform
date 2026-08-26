@@ -33,7 +33,7 @@ class TestMetadataFlow:
 
         # Now safe to access attributes
         assert env.kubernetes.version == "v1.28.0"
-        assert env.kubernetes.node_count == 3
+        assert env.kubernetes.nodeCount == 3
 
         # Collect test metadata
         metadata = collector.collect_test_metadata(
@@ -66,7 +66,7 @@ class TestMetadataFlow:
         if env.kubernetes is not None:
             assert env2.kubernetes is not None
             assert env2.kubernetes.version == env.kubernetes.version
-            assert env2.kubernetes.node_count == env.kubernetes.node_count
+            assert env2.kubernetes.nodeCount == env.kubernetes.nodeCount
         else:
             assert env2.kubernetes is None
 

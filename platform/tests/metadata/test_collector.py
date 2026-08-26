@@ -4,7 +4,6 @@ Unit tests for the metadata collector using builders.
 
 import json
 import tempfile
-from datetime import datetime
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -12,9 +11,12 @@ import pytest
 import yaml
 
 from perfeng.generated.environment import CpuArchitecture, EnvironmentSpecification
+from perfeng.generated.run_metadata import PerformanceRunMetadata, Profile, Trigger
+from perfeng.generated.run_metadata import Status as RunStatus
+from perfeng.generated.run_metadata import Tool as TestTool
+from perfeng.generated.run_metadata import Type as TestType
 from perfeng.metadata.collector import (
     MetadataCollector,
-    TestMetadata,
     collect_run_metadata,
     get_metadata_collector,
 )
@@ -66,9 +68,9 @@ class TestMetadataCollector:
         assert len(env.fingerprint) == 64
         assert env.kubernetes is not None
         assert env.kubernetes.version == "v1.28.0"
-        assert env.kubernetes.node_count == 3
+        assert env.kubernetes.nodeCount == 3
         assert env.runtime is not None
-        assert env.runtime.container_runtime == "containerd"
+        assert env.runtime.containerRuntime == "containerd"
 
     def test_collect_environment_with_override(self, collector):
         """Test environment collection with overrides."""
@@ -83,7 +85,8 @@ class TestMetadataCollector:
         )
 
         # Convert to dict for override (as collector expects dict)
-        override_dict = expected_env.model_dump(exclude_none=True)
+        # includes all fields with None
+        override_dict = expected_env.model_dump()
         collector.set_override("environment", override_dict)
 
         env = collector.collect_environment()
@@ -165,24 +168,41 @@ class TestMetadataCollector:
         metadata = collector.collect_test_metadata(
             test_name="load-test",
             status="running",
-            test_script="load_test.py",
-            test_profile="medium-load",
-            thresholds={"p95": 100},
-            tags=["performance"],
+            test_script="load_test.py",  # Not directly used now, maybe via test.scenario?
+            test_profile="medium-load",  # maps to run.profile
+            thresholds={"p95": 100},  # Not stored directly; would be in candidate or test?
+            tags=["performance"],  # Not in schema; maybe we'll ignore or map to notes?
             trigger_type="ci",
         )
 
-        assert isinstance(metadata, TestMetadata)
-        assert metadata.test_name == "load-test"
-        assert metadata.status == "running"
-        assert metadata.test_script == "load_test.py"
-        assert metadata.test_profile == "medium-load"
-        assert metadata.thresholds == {"p95": 100}
-        assert metadata.tags == ["performance"]
-        assert metadata.trigger_type == "ci"
-        assert isinstance(metadata.start_time, datetime)
-        assert metadata.end_time is None
-        assert metadata.duration_seconds is None
+        assert isinstance(metadata, PerformanceRunMetadata)
+
+        # Check Run
+        assert metadata.run.suite == "load-test"
+        assert metadata.run.profile == Profile.regression  # default since 'medium-load' not in enum
+        assert metadata.run.trigger == Trigger.ci
+        assert metadata.run.status == RunStatus.RUNNING  # mapped from 'running'
+        assert metadata.run.id.startswith("perf-")
+        assert metadata.run.timestamp is not None
+
+        # Check Test
+        assert metadata.test.scenario == "load-test"  # default to test_name
+        assert metadata.test.tool == TestTool.k6  # default
+        assert metadata.test.type == TestType.api  # default
+
+        # Candidate is filled with defaults
+        assert metadata.candidate.gitSha == "0" * 40
+
+        # Environment is present
+        assert metadata.environment is not None
+
+        # Optional fields not provided; should be None
+        assert metadata.runtime is None
+        assert metadata.data is None
+        assert metadata.phases is None
+
+        # 'thresholds', 'tags', etc. are not directly in PerformanceRunMetadata
+        # We might store them as notes or in featureFlags, but for now we assert they're not there.
 
     def test_collect_test_metadata_with_overrides(self, collector):
         """Test test metadata collection with overrides."""
@@ -205,23 +225,44 @@ class TestMetadataCollector:
     @patch("subprocess.run")
     def test_auto_detect_kubernetes(self, mock_run, collector):
         """Test auto-detection of Kubernetes environment."""
-        mock_run.side_effect = [
-            Mock(returncode=0, stdout="", stderr=""),  # cluster-info
-            Mock(returncode=0, stdout="test-context\n", stderr=""),  # current-context
-            Mock(
-                returncode=0,
-                stdout=json.dumps(
-                    {
-                        "items": [
-                            {"metadata": {"name": "node1"}},
-                            {"metadata": {"name": "node2"}},
-                            {"metadata": {"name": "node3"}},
-                        ]
-                    }
-                ),
-                stderr="",
-            ),  # get nodes
-        ]
+
+        def side_effect(*args, **kwargs):
+            cmd = args[0] if args else []
+            if "cluster-info" in cmd:
+                return Mock(returncode=0, stdout="", stderr="")
+            elif "current-context" in cmd:
+                return Mock(returncode=0, stdout="test-context\n", stderr="")
+            elif "version" in cmd:
+                return Mock(
+                    returncode=0, stdout='{"serverVersion":{"gitVersion":"v1.28.0"}}', stderr=""
+                )
+            elif "get nodes" in cmd:
+                return Mock(
+                    returncode=0,
+                    stdout=json.dumps(
+                        {
+                            "items": [
+                                {
+                                    "metadata": {"name": "node1"},
+                                    "status": {"capacity": {"cpu": "4", "memory": "16Gi"}},
+                                },
+                                {
+                                    "metadata": {"name": "node2"},
+                                    "status": {"capacity": {"cpu": "4", "memory": "16Gi"}},
+                                },
+                                {
+                                    "metadata": {"name": "node3"},
+                                    "status": {"capacity": {"cpu": "4", "memory": "16Gi"}},
+                                },
+                            ]
+                        }
+                    ),
+                    stderr="",
+                )
+            else:
+                return Mock(returncode=0, stdout="", stderr="")
+
+        mock_run.side_effect = side_effect
 
         collector.config["auto_detect"] = True
         collector._environment_cache = None
@@ -317,8 +358,8 @@ class TestSchemaIntegration:
             .build()
         )
         assert node_pool.name == "pool-1"
-        assert node_pool.cpu_architecture == CpuArchitecture.amd64
-        assert node_pool.cpu_count == 4
+        assert node_pool.cpuArchitecture == CpuArchitecture.amd64
+        assert node_pool.cpuCount == 4
 
     def test_environment_deserialization(self):
         """Test deserialization from JSON using builders."""

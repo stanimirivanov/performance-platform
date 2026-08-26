@@ -1,7 +1,8 @@
+# platform/tests/builders.py
 """
 Test builders for creating instances of generated environment models.
-These builders simplify test setup by setting optional fields to None
-unless explicitly provided.
+These builders set optional fields to None unless explicitly provided.
+All model fields use camelCase to match the generated Pydantic models.
 
 Usage:
     env = (EnvironmentBuilder()
@@ -29,7 +30,7 @@ from perfeng.generated.environment import (
 # Kubernetes Builder
 # -----------------------------------------------------------------------------
 class KubernetesBuilder:
-    """Builder for Kubernetes model."""
+    """Builder for Kubernetes model (fields: version, nodeCount, nodePools)."""
 
     def __init__(self) -> None:
         self._version: str | None = None
@@ -49,10 +50,11 @@ class KubernetesBuilder:
         return self
 
     def build(self) -> Kubernetes:
+        # camelCase field names as expected by the model
         return Kubernetes(
             version=self._version,
-            node_count=self._node_count,
-            node_pools=self._node_pools,
+            nodeCount=self._node_count,
+            nodePools=self._node_pools,
         )
 
 
@@ -60,7 +62,7 @@ class KubernetesBuilder:
 # Runtime Builder
 # -----------------------------------------------------------------------------
 class RuntimeBuilder:
-    """Builder for Runtime model."""
+    """Builder for Runtime model (fields: containerRuntime, cni, storageClass, kernel)."""
 
     def __init__(self) -> None:
         self._container_runtime: str | None = None
@@ -86,9 +88,9 @@ class RuntimeBuilder:
 
     def build(self) -> Runtime:
         return Runtime(
-            container_runtime=self._container_runtime,
+            containerRuntime=self._container_runtime,
             cni=self._cni,
-            storage_class=self._storage_class,
+            storageClass=self._storage_class,
             kernel=self._kernel,
         )
 
@@ -97,7 +99,7 @@ class RuntimeBuilder:
 # Application Builder
 # -----------------------------------------------------------------------------
 class ApplicationBuilder:
-    """Builder for Application model."""
+    """Builder for Application model (fields: configurationHash, featureFlags)."""
 
     def __init__(self) -> None:
         self._configuration_hash: str | None = None
@@ -113,8 +115,8 @@ class ApplicationBuilder:
 
     def build(self) -> Application:
         return Application(
-            configuration_hash=self._configuration_hash,
-            feature_flags=self._feature_flags,
+            configurationHash=self._configuration_hash,
+            featureFlags=self._feature_flags,
         )
 
 
@@ -122,7 +124,7 @@ class ApplicationBuilder:
 # NodePool Builder
 # -----------------------------------------------------------------------------
 class NodePoolBuilder:
-    """Builder for NodePool model."""
+    """Builder for NodePool model (fields: name, nodeModel, cpuArchitecture, cpuCount, memoryGiB)."""
 
     def __init__(self) -> None:
         self._name: str | None = None
@@ -154,10 +156,10 @@ class NodePoolBuilder:
     def build(self) -> NodePool:
         return NodePool(
             name=self._name,
-            node_model=self._node_model,
-            cpu_architecture=self._cpu_architecture,
-            cpu_count=self._cpu_count,
-            memory_gi_b=self._memory_gi_b,
+            nodeModel=self._node_model,
+            cpuArchitecture=self._cpu_architecture,
+            cpuCount=self._cpu_count,
+            memoryGiB=self._memory_gi_b,
         )
 
 
@@ -165,7 +167,7 @@ class NodePoolBuilder:
 # Compatibility Builder
 # -----------------------------------------------------------------------------
 class CompatibilityBuilder:
-    """Builder for Compatibility model."""
+    """Builder for Compatibility model (fields: status, reasons)."""
 
     def __init__(self) -> None:
         self._status: Status | None = None
@@ -190,7 +192,7 @@ class CompatibilityBuilder:
 # EnvironmentSpecification Builder
 # -----------------------------------------------------------------------------
 class EnvironmentBuilder:
-    """Builder for EnvironmentSpecification model."""
+    """Builder for EnvironmentSpecification (fields: cluster, fingerprint, kubernetes, runtime, application, compatibility)."""
 
     def __init__(self) -> None:
         self._cluster: str | None = None
@@ -279,4 +281,4 @@ def default_node_pool_builder() -> NodePoolBuilder:
 
 def default_compatibility_builder() -> CompatibilityBuilder:
     """Return a CompatibilityBuilder with a default status."""
-    return CompatibilityBuilder().with_status(Status.compatible).with_reasons(["All checks passed"])
+    return CompatibilityBuilder().with_status(Status.COMPATIBLE).with_reasons(["All checks passed"])
