@@ -27,9 +27,6 @@ uv run perfeng --help
 ## Testing
 
 ```bash
-# From the platform directory
-cd platform
-
 # Run all tests
 pytest tests/
 
@@ -44,57 +41,104 @@ pytest tests/metadata/test_collector.py::TestMetadataCollector::test_init_defaul
 ```
 
 ```bash
-# Unit tests only (fast)
-pytest tests/metadata/ -m "not integration"
+# By Group
 
-# Integration tests only
-pytest tests/ -m integration
+# Metadata only
+pytest tests/metadata/ -v
 
-# Skip slow tests
-pytest tests/ -m "not slow"
+# Normalization only
+pytest tests/normalization/ -v
 
-# Tests that require kubectl
-pytest tests/ -m "requires_kubectl"
+# Core only
+pytest tests/core/ -v
+
+# Integration only
+pytest tests/integration/ -v
+```
+
+`````bash
+# By Marker
+
+# All unit tests
+pytest tests/ -m unit -v
+
+# All integration tests
+pytest tests/ -m integration -v
+
+# Metadata unit tests only
+pytest tests/ -m "metadata and unit" -v
+
+# Fast tests (excludes integration, slow, kubectl)
+pytest tests/ -m "not integration and not slow and not requires_kubectl" -v
+```
+
+
+```bash
+# With Coverage
+# All tests with coverage
+pytest tests/ --cov=perfeng --cov-report=html --cov-report=term
+
+# Metadata only with coverage
+pytest tests/metadata/ --cov=perfeng.metadata --cov-report=term
 ```
 
 **Test Coverage Requirements**
+
 - Minimum coverage: 80%
-- Critical paths: 100% (collector, config loader)
+- Critical paths (collector, normalizer): 90%
+- Generated code (environment.py): Excluded from coverage
 
 **Writing New Tests**
 
-```python
-# platform/tests/metadata/test_new_feature.py
+1. Place tests in the appropriate group directory
+  ```python
+  # platform/tests/metadata/test_new_feature.py
+  import pytest
+  from perfeng.metadata.collector import MetadataCollector
+
+  class TestNewFeature:
+      def test_feature_basic(self, collector):
+          """Basic test for new feature."""
+          result = collector.do_something()
+          assert result is not None
+
+      def test_feature_error_case(self):
+          """Test error handling."""
+          with pytest.raises(ValueError):
+              MetadataCollector.invalid_operation()
+  ```
+
+2. Add the group marker at the module level:
+
+````python
 import pytest
-from perfeng.metadata.collector import MetadataCollector
-
-class TestNewFeature:
-    def test_feature_basic(self, collector):
-        """Basic test for new feature."""
-        result = collector.do_something()
-        assert result is not None
-    
-    def test_feature_error_case(self):
-        """Test error handling."""
-        with pytest.raises(ValueError):
-            MetadataCollector.invalid_operation()
+pytestmark = pytest.mark.metadata # or .normalization, .core, .integration
 ```
 
-**Marking Tests**
+3. Mark individual tests with additional markers:
 
-```python
-@pytest.mark.unit
-def test_unit_example():
-pass
+  ```python
+  @pytest.mark.unit
+  def test_unit_example():
+  pass
 
-@pytest.mark.integration
-def test_integration_example():
-pass
+  @pytest.mark.integration
+  def test_integration_example():
+  pass
 
-@pytest.mark.slow
-def test_slow_example():
-pass
-```
+  @pytest.mark.slow
+  def test_slow_example():
+  pass
+`````
+
+**Test Groups**
+
+| Group         | Path                   | Marker                       | Description                                |
+| ------------- | ---------------------- | ---------------------------- | ------------------------------------------ |
+| Metadata      | `tests/metadata/`      | `@pytest.mark.metadata`      | Metadata collection, environment detection |
+| Normalization | `tests/normalization/` | `@pytest.mark.normalization` | Data normalization (k6, etc.)              |
+| Core          | `tests/core/`          | `@pytest.mark.core`          | Core utilities (run ID, validation)        |
+| Integration   | `tests/integration/`   | `@pytest.mark.integration`   | End-to-end tests                           |
 
 ## Troubleshooting
 
@@ -130,32 +174,17 @@ def test_db():
 
 **CI/CD Integration**
 
-Tests are automatically run in CI/CD pipeline:
+Tests run automatically on:
 
-```yaml
-# .github/workflows/tests.yml
-name: Tests
-on: [push, pull_request]
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install pytest pytest-cov
-      - name: Run tests
-        run: |
-          pytest tests/ --cov=perfeng --cov-report=xml
-      - name: Upload coverage
-        uses: codecov/codecov-action@v3
-        with:
-          file: ./coverage.xml
-```
+- Pull requests
+- Pushes to main branch
+- Release tags
+
+Required checks:
+
+- All tests pass
+- Coverage meets minimum
+- No regressions in critical paths
 
 **Test Data**
 

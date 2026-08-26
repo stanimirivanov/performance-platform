@@ -63,15 +63,24 @@ pythonpath = ["src"]
 addopts = "-ra -q --cov=perfeng --cov-report=term-missing --cov-report=html"
 asyncio_mode = "auto"
 markers = [
-    "unit: Unit tests",
-    "integration: Integration tests",
+    "metadata: Metadata collection tests",
+    "normalization: Data normalization tests",
+    "core: Core functionality tests",
+    "integration: Integration tests (requires external dependencies)",
+    "unit: Unit tests (fast, no external dependencies)",
     "slow: Slow running tests",
     "requires_kubectl: Tests that require kubectl",
+    "requires_psutil: Tests that require psutil",
 ]
 
 [tool.coverage.run]
 source = ["src/perfeng"]
-omit = ["tests/*", "*/generated/*"]
+omit = [
+    "tests/*",
+    "*/generated/*",
+    "*/scripts/*",
+    "*/examples/*",
+]
 
 [tool.coverage.report]
 show_missing = true
