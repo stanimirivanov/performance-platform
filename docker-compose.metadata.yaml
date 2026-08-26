@@ -1,0 +1,70 @@
+# Local development environment for metadata service
+
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: metadata-postgres
+    environment:
+      POSTGRES_DB: metadata
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./platform/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./platform/db/migrations/001_initial.sql:/docker-entrypoint-initdb.d/02-migration.sql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U test_user -d metadata']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - metadata-network
+
+  metadata-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.metadata
+    container_name: metadata-api
+    environment:
+      DATABASE_URL: postgresql://test_user:test_password@postgres:5432/metadata
+      API_PORT: 8000
+    ports:
+      - '8000:8000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./platform/api:/app/api
+      - ./platform/metadata:/app/metadata
+    networks:
+      - metadata-network
+    command: uvicorn api.metadata_service:app --host 0.0.0.0 --port 8000 --reload
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: metadata-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - '5050:80'
+    depends_on:
+      - postgres
+    networks:
+      - metadata-network
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+
+networks:
+  metadata-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+    driver: local
+  pgadmin-data:
+    driver: local
