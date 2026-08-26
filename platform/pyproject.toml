@@ -60,16 +60,30 @@ ignore = ["E501"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-addopts = "-ra -q --strict-markers --strict-config"
+addopts = "-ra -q --cov=perfeng --cov-report=term-missing --cov-report=html"
 asyncio_mode = "auto"
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "slow: Slow running tests",
+    "requires_kubectl: Tests that require kubectl",
+]
 
 [tool.coverage.run]
-source = ["src/pricepilot"]
-omit = ["*/tests/*", "*/test_*.py"]
+source = ["src/perfeng"]
+omit = ["tests/*", "*/generated/*"]
 
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
 
 [tool.mypy]
 python_version = "3.11"
