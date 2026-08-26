@@ -53,8 +53,15 @@ class MetadataCollector:
     and creates a validated EnvironmentSpecification object.
     """
 
-    def __init__(self, config_path: str | Path | None = None):
-        self.config = self._load_config(config_path)
+    def __init__(
+        self,
+        config_path: str | Path | None = None,
+        config_dict: dict[str, Any] | None = None,
+    ) -> None:
+        if config_dict is not None:
+            self.config = config_dict
+        else:
+            self.config = self._load_config(config_path)
         self.override_values: dict[str, Any] = {}
         self._environment_cache: EnvironmentSpecification | None = None
 

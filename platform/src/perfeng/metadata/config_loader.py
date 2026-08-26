@@ -1,6 +1,6 @@
 """
 Configuration loader for metadata collector with environment-specific
-initialization (local, dev, prod, etc.)
+initialization (local, dev, staging, prod, test).
 """
 
 import os
@@ -9,13 +9,16 @@ from typing import Any, Literal
 
 import yaml
 
+from perfeng.metadata.collector import MetadataCollector
+
+# Define EnvironmentType using Literal
 EnvironmentType = Literal["local", "dev", "staging", "prod", "test"]
 
 
 class ConfigLoader:
     """Loads environment-specific configuration for metadata collection."""
 
-    def __init__(self, env_type: EnvironmentType | None = None):
+    def __init__(self, env_type: EnvironmentType | None = None) -> None:
         self.env_type = env_type or self._detect_environment()
         self.config_dir = Path(os.environ.get("PERFENG_CONFIG_DIR", "~/.perfeng")).expanduser()
 
@@ -71,7 +74,9 @@ class ConfigLoader:
             "auto_detect": True,
             "timeout_seconds": 30,
             "fingerprint_excludes": ["local", "test"],
-            "environment_config": {"runtime": {"kernel": None}},
+            "environment_config": {
+                "runtime": {"kernel": None},
+            },
         }
 
     def _load_env_config(self) -> dict[str, Any]:
@@ -124,9 +129,8 @@ class ConfigLoader:
                 # Convert to appropriate type
                 if env_var == "PERFENG_AUTO_DETECT":
                     value = value.lower() == "true"
-                elif env_var == "PERFENG_TIMEOUT" or env_var == "PERFENG_NODE_COUNT":
+                elif env_var in ("PERFENG_TIMEOUT", "PERFENG_NODE_COUNT"):
                     value = int(value)
-
                 self._set_nested_value(env_config, config_path, value)
 
         return env_config
@@ -146,8 +150,16 @@ class ConfigLoader:
 
 def create_collector_for_environment(
     env_type: EnvironmentType | None = None,
-) -> "MetadataCollector":
-    """Create a metadata collector configured for a specific environment."""
+) -> MetadataCollector:
+    """
+    Create a metadata collector configured for a specific environment.
+
+    Args:
+        env_type: The environment type ('local', 'dev', 'staging', 'prod', 'test').
+
+    Returns:
+        A MetadataCollector instance with merged configuration.
+    """
     from .collector import MetadataCollector
 
     loader = ConfigLoader(env_type)
@@ -159,17 +171,7 @@ def create_collector_for_environment(
     env_config = loader.load_environment_variables()
     config = loader._deep_merge(config, env_config)
 
-    # Write config to temp file
-    import tempfile
-
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-        yaml.dump(config, f)
-        temp_path = f.name
-
-    # Create collector with merged config
-    collector = MetadataCollector(temp_path)
-
-    # Clean up temp file
-    os.unlink(temp_path)
+    # Create collector with merged config dictionary (no temp file needed)
+    collector = MetadataCollector(config_dict=config)
 
     return collector

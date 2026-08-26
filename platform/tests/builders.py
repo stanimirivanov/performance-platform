@@ -1,4 +1,3 @@
-# platform/tests/builders.py
 """
 Test builders for creating instances of generated environment models.
 These builders set optional fields to None unless explicitly provided.
@@ -50,7 +49,6 @@ class KubernetesBuilder:
         return self
 
     def build(self) -> Kubernetes:
-        # camelCase field names as expected by the model
         return Kubernetes(
             version=self._version,
             nodeCount=self._node_count,

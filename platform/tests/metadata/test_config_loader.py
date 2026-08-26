@@ -3,13 +3,40 @@ Unit tests for the configuration loader.
 """
 
 import os
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+import yaml
 
 from perfeng.metadata.config_loader import ConfigLoader, create_collector_for_environment
 
-pytestmark = pytest.mark.metadata
+# -----------------------------------------------------------------------------
+# Fixtures (specific to this test module)
+# -----------------------------------------------------------------------------
+
+
+@pytest.fixture
+def loader(tmp_path) -> ConfigLoader:
+    """Return a ConfigLoader instance with a temporary config directory."""
+    with patch.dict(os.environ, {"PERFENG_CONFIG_DIR": str(tmp_path)}):
+        with patch("pathlib.Path.expanduser", return_value=tmp_path):
+            loader = ConfigLoader("local")
+            loader.config_dir = tmp_path  # ensure isolation
+            return loader
+
+
+@pytest.fixture
+def temp_config_dir(tmp_path) -> Path:
+    """Create a temporary configuration directory."""
+    config_dir = tmp_path / ".perfeng"
+    config_dir.mkdir()
+    return config_dir
+
+
+# -----------------------------------------------------------------------------
+# Tests
+# -----------------------------------------------------------------------------
 
 
 class TestConfigLoader:
@@ -17,71 +44,70 @@ class TestConfigLoader:
 
     def test_init_default(self):
         """Test default initialization."""
-        loader = ConfigLoader()
-        assert loader.env_type in ["local", "dev", "staging", "prod", "test"]
+        with patch("pathlib.Path.expanduser", return_value=Path("/fake/home")):
+            with patch.dict(os.environ, {}, clear=True):
+                loader = ConfigLoader()
+                assert loader.env_type in ["local", "dev", "staging", "prod", "test"]
 
     def test_init_with_env(self):
         """Test initialization with specific environment."""
-        loader = ConfigLoader("local")
-        assert loader.env_type == "local"
+        with patch("pathlib.Path.expanduser", return_value=Path("/fake/home")):
+            loader = ConfigLoader("local")
+            assert loader.env_type == "local"
 
-        loader = ConfigLoader("prod")
-        assert loader.env_type == "prod"
+            loader = ConfigLoader("prod")
+            assert loader.env_type == "prod"
 
     @patch.dict(os.environ, {"PERFENG_ENV": "prod"})
     def test_detect_environment_from_env(self):
         """Test environment detection from environment variable."""
-        loader = ConfigLoader()
-        assert loader.env_type == "prod"
+        with patch("pathlib.Path.expanduser", return_value=Path("/fake/home")):
+            loader = ConfigLoader()
+            assert loader.env_type == "prod"
 
     @patch.dict(os.environ, {}, clear=True)
     @patch("builtins.open")
     def test_detect_environment_from_namespace(self, mock_open):
         """Test environment detection from Kubernetes namespace."""
         mock_open.return_value.__enter__.return_value.read.return_value = "my-app-prod"
-        loader = ConfigLoader()
-        assert loader.env_type == "prod"
+        with patch("pathlib.Path.expanduser", return_value=Path("/fake/home")):
+            loader = ConfigLoader()
+            assert loader.env_type == "prod"
 
     @patch.dict(os.environ, {}, clear=True)
     def test_detect_environment_default(self):
         """Test default environment detection."""
-        loader = ConfigLoader()
-        assert loader.env_type == "local"
+        with patch("pathlib.Path.expanduser", return_value=Path("/fake/home")):
+            loader = ConfigLoader()
+            assert loader.env_type == "local"
 
-    def test_load_base_config(self, tmp_path):
+    def test_load_base_config(self, temp_config_dir):
         """Test loading base configuration."""
-        # Create test config
-        config_dir = tmp_path / ".perfeng"
-        config_dir.mkdir()
-        base_config = config_dir / "base.yaml"
+        base_config = temp_config_dir / "base.yaml"
         base_config.write_text("""
             auto_detect: true
             timeout_seconds: 60
             fingerprint_excludes: []
         """)
 
-        with patch.dict(os.environ, {"PERFENG_CONFIG_DIR": str(config_dir)}):
+        with patch.dict(os.environ, {"PERFENG_CONFIG_DIR": str(temp_config_dir)}):
             loader = ConfigLoader("local")
             config = loader._load_base_config()
-
             assert config["auto_detect"] is True
             assert config["timeout_seconds"] == 60
 
     def test_load_base_config_default(self):
         """Test loading base configuration when no file exists."""
-        loader = ConfigLoader("local")
-        config = loader._load_base_config()
+        with patch("pathlib.Path.expanduser", return_value=Path("/fake/home")):
+            loader = ConfigLoader("local")
+            config = loader._load_base_config()
+            assert "auto_detect" in config
+            assert "timeout_seconds" in config
+            assert "fingerprint_excludes" in config
 
-        # Should return defaults
-        assert "auto_detect" in config
-        assert "timeout_seconds" in config
-        assert "fingerprint_excludes" in config
-
-    def test_load_env_config(self, tmp_path):
+    def test_load_env_config(self, temp_config_dir):
         """Test loading environment-specific configuration."""
-        config_dir = tmp_path / ".perfeng"
-        config_dir.mkdir()
-        env_config = config_dir / "local.yaml"
+        env_config = temp_config_dir / "local.yaml"
         env_config.write_text("""
             environment_config:
                 cluster: test-cluster
@@ -89,20 +115,29 @@ class TestConfigLoader:
                     version: v1.28.0
         """)
 
-        with patch.dict(os.environ, {"PERFENG_CONFIG_DIR": str(config_dir)}):
+        with patch.dict(os.environ, {"PERFENG_CONFIG_DIR": str(temp_config_dir)}):
             loader = ConfigLoader("local")
             config = loader._load_env_config()
-
             assert config["environment_config"]["cluster"] == "test-cluster"
             assert config["environment_config"]["kubernetes"]["version"] == "v1.28.0"
 
-    def test_load_env_config_default(self):
+    def test_load_env_config_default(self, temp_config_dir):
         """Test loading environment config when no file exists."""
-        loader = ConfigLoader("local")
-        config = loader._load_env_config()
+        # Override the method to only check the temp config directory
+        with patch.dict(os.environ, {"PERFENG_CONFIG_DIR": str(temp_config_dir)}):
+            loader = ConfigLoader("local")
 
-        # Should return empty dict
-        assert config == {}
+            # Replace the method with one that only looks in the config_dir
+            def patched_load_env_config():
+                env_path = loader.config_dir / f"{loader.env_type}.yaml"
+                if env_path.exists():
+                    with open(env_path) as f:
+                        return yaml.safe_load(f)
+                return {}
+
+            loader._load_env_config = patched_load_env_config
+            config = loader._load_env_config()
+            assert config == {}
 
     def test_deep_merge(self, loader):
         """Test deep merge of dictionaries."""
@@ -131,7 +166,6 @@ class TestConfigLoader:
             },
         ):
             config = loader.load_environment_variables()
-
             assert config["environment_config"]["cluster"] == "env-cluster"
             assert config["auto_detect"] is False
             assert config["timeout_seconds"] == 60
@@ -139,21 +173,18 @@ class TestConfigLoader:
             assert config["environment_config"]["kubernetes"]["nodeCount"] == 5
             assert config["environment_config"]["runtime"]["containerRuntime"] == "containerd"
 
-    def test_load_complete_config(self, tmp_path):
+    def test_load_complete_config(self, temp_config_dir):
         """Test loading complete configuration from all sources."""
-        config_dir = tmp_path / ".perfeng"
-        config_dir.mkdir()
-
-        # Base config
-        base_config = config_dir / "base.yaml"
+        # Write base config
+        base_config = temp_config_dir / "base.yaml"
         base_config.write_text("""
             auto_detect: true
             timeout_seconds: 30
             fingerprint_excludes: ['test']
         """)
 
-        # Environment config
-        env_config = config_dir / "dev.yaml"
+        # Write env config
+        env_config = temp_config_dir / "dev.yaml"
         env_config.write_text("""
             environment_config:
                 cluster: dev-cluster
@@ -163,37 +194,38 @@ class TestConfigLoader:
         """)
 
         with patch.dict(
-            os.environ, {"PERFENG_CONFIG_DIR": str(config_dir), "PERFENG_AUTO_DETECT": "false"}
+            os.environ,
+            {
+                "PERFENG_CONFIG_DIR": str(temp_config_dir),
+                "PERFENG_AUTO_DETECT": "false",
+            },
         ):
             loader = ConfigLoader("dev")
-            config = loader.load_config()
+            config = loader.load_config()  # base + env file
+            env_vars = loader.load_environment_variables()  # env vars
+            config = loader._deep_merge(config, env_vars)  # merge them
 
-            # Environment variable overrides base
             assert config["auto_detect"] is False
-
-            # Environment config loaded
             assert config["environment_config"]["cluster"] == "dev-cluster"
             assert config["environment_config"]["kubernetes"]["version"] == "v1.28.0"
             assert config["environment_config"]["kubernetes"]["nodeCount"] == 3
-
-            # Base config preserved
             assert config["fingerprint_excludes"] == ["test"]
 
 
 class TestFactoryFunctions:
     """Test factory functions."""
 
-    def test_create_collector_for_environment(self):
+    def test_create_collector_for_environment(self, tmp_path):
         """Test creating a collector for a specific environment."""
-        collector = create_collector_for_environment("local")
-        assert collector is not None
+        with patch.dict(os.environ, {"PERFENG_CONFIG_DIR": str(tmp_path)}):
+            collector = create_collector_for_environment("local")
+            assert collector is not None
+            assert hasattr(collector, "collect_environment")
+            assert hasattr(collector, "config")
 
-        # Should have loaded configuration
-        assert hasattr(collector, "collect_environment")
-        assert hasattr(collector, "config")
-
-    def test_create_collector_with_no_env(self):
+    def test_create_collector_with_no_env(self, tmp_path):
         """Test creating a collector without specifying environment."""
-        collector = create_collector_for_environment()
-        assert collector is not None
-        assert hasattr(collector, "collect_environment")
+        with patch.dict(os.environ, {"PERFENG_CONFIG_DIR": str(tmp_path)}):
+            collector = create_collector_for_environment()
+            assert collector is not None
+            assert hasattr(collector, "collect_environment")

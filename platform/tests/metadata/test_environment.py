@@ -9,6 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from perfeng.generated.environment import CpuArchitecture, EnvironmentSpecification, Status
+from perfeng.metadata.collector import MetadataCollector
 from tests.builders import (
     ApplicationBuilder,
     CompatibilityBuilder,
@@ -22,7 +23,24 @@ from tests.builders import (
     default_runtime_builder,
 )
 
+# -----------------------------------------------------------------------------
+# Fixtures (local to this test module)
+# -----------------------------------------------------------------------------
+
+
+@pytest.fixture
+def collector() -> MetadataCollector:
+    """Return a basic metadata collector instance."""
+    return MetadataCollector()
+
+
+# Mark the entire module as metadata tests
 pytestmark = pytest.mark.metadata
+
+
+# -----------------------------------------------------------------------------
+# Tests
+# -----------------------------------------------------------------------------
 
 
 class TestEnvironmentSpecification:
@@ -70,11 +88,11 @@ class TestEnvironmentSpecification:
         assert env.cluster == "test-cluster"
         assert env.kubernetes is not None
         assert env.kubernetes.version == "v1.28.0"
-        assert env.kubernetes.node_count == 3
+        assert env.kubernetes.nodeCount == 3
         assert env.runtime is not None
-        assert env.runtime.container_runtime == "containerd"
+        assert env.runtime.containerRuntime == "containerd"
         assert env.application is not None
-        assert env.application.configuration_hash == "config123"
+        assert env.application.configurationHash == "config123"
 
     def test_invalid_fingerprint(self):
         """Test that an invalid fingerprint raises ValidationError."""
@@ -116,9 +134,8 @@ class TestEnvironmentSpecification:
 
         invalid_versions = ["1.28", "v1.28", "1.28.0.1", "v1.28.0-beta", "latest"]
         for version in invalid_versions:
-            k8s = KubernetesBuilder().with_version(version).with_node_count(1).build()
             with pytest.raises(ValidationError):
-                (default_environment_builder().with_kubernetes(k8s).build())
+                KubernetesBuilder().with_version(version).with_node_count(1).build()
 
     def test_node_count_minimum(self):
         """Test that node_count must be at least 1."""
@@ -126,7 +143,7 @@ class TestEnvironmentSpecification:
         k8s = KubernetesBuilder().with_version("1.28.0").with_node_count(1).build()
         env = default_environment_builder().with_kubernetes(k8s).build()
         assert env.kubernetes is not None
-        assert env.kubernetes.node_count == 1
+        assert env.kubernetes.nodeCount == 1
 
         # Invalid: 0
         with pytest.raises(ValidationError):
@@ -141,11 +158,12 @@ class TestEnvironmentSpecification:
         # Valid node pool
         node_pool = default_node_pool_builder().with_name("pool-1").with_cpu_count(4).build()
         assert node_pool.name == "pool-1"
-        assert node_pool.cpu_count == 4
+        assert node_pool.cpuCount == 4
+        assert node_pool.cpuArchitecture == CpuArchitecture.amd64
 
         # CPU architecture enum
-        assert CpuArchitecture.amd64 == "amd64"
-        assert CpuArchitecture.arm64 == "arm64"
+        assert CpuArchitecture.amd64.value == "amd64"
+        assert CpuArchitecture.arm64.value == "arm64"
 
         # Invalid architecture
         with pytest.raises(ValidationError):
@@ -181,7 +199,7 @@ class TestEnvironmentSpecification:
             .with_memory_gi_b(0.0)
             .build()
         )
-        assert node_pool_zero.memory_gi_b == 0.0
+        assert node_pool_zero.memoryGiB == 0.0
 
         # Negative memory is invalid
         with pytest.raises(ValidationError):
@@ -198,13 +216,13 @@ class TestEnvironmentSpecification:
     def test_runtime_model(self):
         """Test Runtime model."""
         runtime = default_runtime_builder().with_container_runtime("containerd").build()
-        assert runtime.container_runtime == "containerd"
+        assert runtime.containerRuntime == "containerd"
 
         # All fields are optional, builder will set them to None by default
         runtime_empty = RuntimeBuilder().build()
-        assert runtime_empty.container_runtime is None
+        assert runtime_empty.containerRuntime is None
         assert runtime_empty.cni is None
-        assert runtime_empty.storage_class is None
+        assert runtime_empty.storageClass is None
         assert runtime_empty.kernel is None
 
     def test_application_model(self):
@@ -215,9 +233,9 @@ class TestEnvironmentSpecification:
             .with_feature_flags({"enabled": True, "mode": "fast"})
             .build()
         )
-        assert app.configuration_hash == "abc123"
-        assert app.feature_flags is not None
-        assert app.feature_flags["mode"] == "fast"
+        assert app.configurationHash == "abc123"
+        assert app.featureFlags is not None
+        assert app.featureFlags["mode"] == "fast"
 
         # Feature flags with null
         app_nulls = (
@@ -226,8 +244,8 @@ class TestEnvironmentSpecification:
             .with_feature_flags({"nullable": None, "number": 42.5})
             .build()
         )
-        assert app_nulls.feature_flags is not None
-        assert app_nulls.feature_flags["nullable"] is None
+        assert app_nulls.featureFlags is not None
+        assert app_nulls.featureFlags["nullable"] is None
 
         # Invalid feature flag (list)
         with pytest.raises(ValidationError):
@@ -242,11 +260,11 @@ class TestEnvironmentSpecification:
         """Test Compatibility model."""
         compat = (
             CompatibilityBuilder()
-            .with_status(Status.compatible)
+            .with_status(Status.COMPATIBLE)
             .with_reasons(["All checks passed"])
             .build()
         )
-        assert compat.status == Status.compatible
+        assert compat.status == Status.COMPATIBLE
         assert compat.reasons == ["All checks passed"]
 
         # Invalid status
@@ -347,9 +365,9 @@ class TestEnvironmentModelIntegration:
         assert parsed["cluster"] == env.cluster
         assert parsed["fingerprint"] == env.fingerprint
 
-    def test_environment_roundtrip_with_collector(self, collector_with_config):
+    def test_environment_roundtrip_with_collector(self, collector):
         """Test roundtrip: collect -> serialize -> deserialize -> compare."""
-        original = collector_with_config.collect_environment()
+        original = collector.collect_environment()
         json_str = original.model_dump_json()
         reconstructed = EnvironmentSpecification.model_validate_json(json_str)
 
@@ -359,21 +377,21 @@ class TestEnvironmentModelIntegration:
         if original.kubernetes is not None:
             assert reconstructed.kubernetes is not None
             assert reconstructed.kubernetes.version == original.kubernetes.version
-            assert reconstructed.kubernetes.node_count == original.kubernetes.node_count
+            assert reconstructed.kubernetes.nodeCount == original.kubernetes.nodeCount
         else:
             assert reconstructed.kubernetes is None
 
         if original.runtime is not None:
             assert reconstructed.runtime is not None
-            assert reconstructed.runtime.container_runtime == original.runtime.container_runtime
+            assert reconstructed.runtime.containerRuntime == original.runtime.containerRuntime
         else:
             assert reconstructed.runtime is None
 
         if original.application is not None:
             assert reconstructed.application is not None
             assert (
-                reconstructed.application.configuration_hash
-                == original.application.configuration_hash
+                reconstructed.application.configurationHash
+                == original.application.configurationHash
             )
         else:
             assert reconstructed.application is None
