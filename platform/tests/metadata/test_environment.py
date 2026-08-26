@@ -216,6 +216,7 @@ class TestEnvironmentSpecification:
             .build()
         )
         assert app.configuration_hash == "abc123"
+        assert app.feature_flags is not None
         assert app.feature_flags["mode"] == "fast"
 
         # Feature flags with null
@@ -225,6 +226,7 @@ class TestEnvironmentSpecification:
             .with_feature_flags({"nullable": None, "number": 42.5})
             .build()
         )
+        assert app_nulls.feature_flags is not None
         assert app_nulls.feature_flags["nullable"] is None
 
         # Invalid feature flag (list)
@@ -312,11 +314,7 @@ class TestEnvironmentSpecification:
             # Missing fingerprint
             EnvironmentSpecification(
                 cluster="test",
-                kubernetes=None,
-                runtime=None,
-                application=None,
-                compatibility=None,
-            )
+            )  # type: ignore
 
     def test_model_dump_with_exclude(self):
         """Test model_dump with exclude options."""

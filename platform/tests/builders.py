@@ -2,6 +2,13 @@
 Test builders for creating instances of generated environment models.
 These builders simplify test setup by setting optional fields to None
 unless explicitly provided.
+
+Usage:
+    env = (EnvironmentBuilder()
+           .with_cluster("my-cluster")
+           .with_fingerprint("a"*64)
+           .with_kubernetes(KubernetesBuilder().with_version("1.28.0").with_node_count(3).build())
+           .build())
 """
 
 from typing import Any
@@ -18,10 +25,13 @@ from perfeng.generated.environment import (
 )
 
 
+# -----------------------------------------------------------------------------
+# Kubernetes Builder
+# -----------------------------------------------------------------------------
 class KubernetesBuilder:
     """Builder for Kubernetes model."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._version: str | None = None
         self._node_count: int | None = None
         self._node_pools: list[NodePool] | None = None
@@ -46,10 +56,13 @@ class KubernetesBuilder:
         )
 
 
+# -----------------------------------------------------------------------------
+# Runtime Builder
+# -----------------------------------------------------------------------------
 class RuntimeBuilder:
     """Builder for Runtime model."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._container_runtime: str | None = None
         self._cni: str | None = None
         self._storage_class: str | None = None
@@ -80,15 +93,18 @@ class RuntimeBuilder:
         )
 
 
+# -----------------------------------------------------------------------------
+# Application Builder
+# -----------------------------------------------------------------------------
 class ApplicationBuilder:
     """Builder for Application model."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._configuration_hash: str | None = None
         self._feature_flags: dict[str, Any] | None = None
 
-    def with_configuration_hash(self, hash: str) -> "ApplicationBuilder":
-        self._configuration_hash = hash
+    def with_configuration_hash(self, hash_value: str) -> "ApplicationBuilder":
+        self._configuration_hash = hash_value
         return self
 
     def with_feature_flags(self, flags: dict[str, Any]) -> "ApplicationBuilder":
@@ -102,10 +118,13 @@ class ApplicationBuilder:
         )
 
 
+# -----------------------------------------------------------------------------
+# NodePool Builder
+# -----------------------------------------------------------------------------
 class NodePoolBuilder:
     """Builder for NodePool model."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._name: str | None = None
         self._node_model: str | None = None
         self._cpu_architecture: CpuArchitecture | None = None
@@ -142,10 +161,13 @@ class NodePoolBuilder:
         )
 
 
+# -----------------------------------------------------------------------------
+# Compatibility Builder
+# -----------------------------------------------------------------------------
 class CompatibilityBuilder:
     """Builder for Compatibility model."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._status: Status | None = None
         self._reasons: list[str] | None = None
 
@@ -164,10 +186,13 @@ class CompatibilityBuilder:
         )
 
 
+# -----------------------------------------------------------------------------
+# EnvironmentSpecification Builder
+# -----------------------------------------------------------------------------
 class EnvironmentBuilder:
     """Builder for EnvironmentSpecification model."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._cluster: str | None = None
         self._fingerprint: str | None = None
         self._kubernetes: Kubernetes | None = None
@@ -202,8 +227,8 @@ class EnvironmentBuilder:
     def build(self) -> EnvironmentSpecification:
         # All fields are required, but can be None
         return EnvironmentSpecification(
-            cluster=self._cluster,  # type: ignore (will be set)
-            fingerprint=self._fingerprint,  # type: ignore
+            cluster=self._cluster,  # type: ignore[arg-type]  # will be set
+            fingerprint=self._fingerprint,  # type: ignore[arg-type]
             kubernetes=self._kubernetes,
             runtime=self._runtime,
             application=self._application,
@@ -211,7 +236,9 @@ class EnvironmentBuilder:
         )
 
 
-# Convenience functions to create default builders with common presets
+# -----------------------------------------------------------------------------
+# Default builders with common presets
+# -----------------------------------------------------------------------------
 def default_environment_builder() -> EnvironmentBuilder:
     """Return an EnvironmentBuilder with a default cluster and fingerprint."""
     return EnvironmentBuilder().with_cluster("test-cluster").with_fingerprint("a" * 64)
@@ -233,8 +260,13 @@ def default_runtime_builder() -> RuntimeBuilder:
     )
 
 
+def default_application_builder() -> ApplicationBuilder:
+    """Return an ApplicationBuilder with a default configuration hash."""
+    return ApplicationBuilder().with_configuration_hash("abc123")
+
+
 def default_node_pool_builder() -> NodePoolBuilder:
-    """Return a NodePoolBuilder with a default node pool."""
+    """Return a NodePoolBuilder with a default node pool configuration."""
     return (
         NodePoolBuilder()
         .with_name("pool-1")
@@ -243,3 +275,8 @@ def default_node_pool_builder() -> NodePoolBuilder:
         .with_cpu_count(4)
         .with_memory_gi_b(16.0)
     )
+
+
+def default_compatibility_builder() -> CompatibilityBuilder:
+    """Return a CompatibilityBuilder with a default status."""
+    return CompatibilityBuilder().with_status(Status.compatible).with_reasons(["All checks passed"])
