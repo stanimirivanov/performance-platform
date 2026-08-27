@@ -76,6 +76,34 @@ This installs:
 
 Other infrastructure commands can be found in [Makefile](../Makefile).
 
+## Run database migrations
+
+Migrations are managed with a custom Python script that applies timestamped SQL
+files in order.
+
+**Prerequisites**:
+
+- PostgreSQL is running (either locally or via the Helm chart).
+- The migration script uses `localhost:5432` by default. If using Kubernetes,
+  port‑forward the service first:
+
+  ```bash
+  make port-forward # or kubectl port-forward -n metadata-db svc/postgres-service 5432:5432
+  ```
+
+**Commands**:
+
+```bash
+# Apply all pending migrations (idempotent)
+make apply-migrations
+
+# Reset the database (drops all schemas and reapplies from scratch)
+make reset-migrations
+```
+
+The script stores applied migration names in a `metadata.migrations` table, so
+repeated runs only apply new files.
+
 ## Sample SUT Management
 
 A sample System Under Test is provided for testing purposes. Install, check
@@ -89,8 +117,8 @@ make sut-uninstall
 
 ## k6 Performance Testing
 
-K6 testing in the cluster depends on building the Docker image and the sample 
-sut or other target. 
+K6 testing in the cluster depends on building the Docker image and the sample
+sut or other target.
 
 ```bash
 ## Install sample SUT
@@ -103,7 +131,7 @@ make k6-build-image
 k6-smoke: k6-build-image
 
 ## Run k6 search smoke test
-k6-search-smoke: k6-build-image 
+k6-search-smoke: k6-build-image
 ```
 
 Other k6 test commands can be found in [Makefile](../Makefile).
@@ -135,7 +163,7 @@ kubectl port-forward -n perf-platform svc/minio 9001:9001
 ### Node Labels
 
 | Node          | Label                            | Purpose                  |
-|---------------|----------------------------------|--------------------------|
+| ------------- | -------------------------------- | ------------------------ |
 | Control Plane | `workload=control-plane`         | Kubernetes control plane |
 | Worker 1      | `workload=performance-generator` | k6 test generator pods   |
 | Worker 2      | `workload=sut`                   | System under test        |
@@ -143,7 +171,7 @@ kubectl port-forward -n perf-platform svc/minio 9001:9001
 ### Namespaces
 
 | Namespace         | Purpose                           |
-|-------------------|-----------------------------------|
+| ----------------- | --------------------------------- |
 | `perf-platform`   | Platform orchestration components |
 | `perf-generators` | Test generator pods (k6)          |
 | `perf-sut`        | System under test                 |
@@ -152,11 +180,10 @@ kubectl port-forward -n perf-platform svc/minio 9001:9001
 ### Helm Charts
 
 | Chart           | Purpose                             |
-|-----------------|-------------------------------------|
+| --------------- | ----------------------------------- |
 | `perfeng-infra` | Full infrastructure (10 sub-charts) |
 | `sample-sut`    | Sample System Under Test            |
 | `k6-runner`     | k6 test execution                   |
-
 
 ## Troubleshooting
 
@@ -218,6 +245,7 @@ kubectl describe limitrange -n <namespace>
 ```
 
 ### k6 test fails
+
 ```bash
 # Check if SUT is running
 kubectl get pods -n perf-sut
@@ -241,23 +269,27 @@ make infra-install
 # 3. Verify infrastructure
 make infra-status
 
-# 4. Install sample SUT
+# 4. Apply migrations
+make apply-migrations
+
+# 5. Install sample SUT
 make sut-install
 
-# 5. Build k6 image
+# 6. Build k6 image
 make k6-build-image
 
-# 6. Run smoke test
+# 7. Run smoke test
 make k6-search-smoke
 
-# 7. Check results
+# 8. Check results
 make k6-list
 kubectl get jobs -n perf-generators
 kubectl logs -n perf-generators -l app=k6-test --tail=50
 
-# 8. Clean up
+# 9. Clean up
 make k6-uninstall TEST=search PROFILE=smoke
 make sut-uninstall
+make reset-migrations
 make infra-uninstall
 make cluster-down
 ```

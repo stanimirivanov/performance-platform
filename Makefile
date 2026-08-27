@@ -1,5 +1,5 @@
 # --- Setup & Installation ---
-.PHONY: help setup install generate-models apply-migrations dev-install test lint format clean
+.PHONY: help setup install generate-models dev-install test lint format clean
 
 help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
@@ -19,10 +19,6 @@ install: ## Install all dependencies
 
 generate-models: ## Generate Pydantic models from JSON schemas
 	cd platform && uv run python scripts/generate_models.py
-
-apply-migrations: ## Apply database migrations
-	@echo "Make sure PostgreSQL is port-forwarded (run 'make port-forward' in another terminal)"
-	cd platform && uv run python scripts/run_migrations.py
 
 test: ## Run all tests
 	cd platform && uv run pytest
@@ -90,9 +86,18 @@ infra-upgrade: ## Upgrade infrastructure
 infra-uninstall: ## Uninstall infrastructure
 	helm uninstall perfeng-infra
 
-.PHONY: port-forward
+.PHONY: port-forward apply-migrations reset-migrations
+
 port-forward:
 	kubectl port-forward -n metadata-db svc/postgres-service 5432:5432
+
+apply-migrations: ## Apply database migrations
+	@echo "Make sure PostgreSQL is port-forwarded (run 'make port-forward' in another terminal)"
+	cd platform && uv run python scripts/run_migrations.py
+
+reset-migrations: ## Reset database migrations
+	@echo "Make sure PostgreSQL is port-forwarded (run 'make port-forward' in another terminal)"
+	cd platform && uv run python scripts/run_migrations.py --reset
 
 # --- k6 Tests ---
 .PHONY: sut-install sut-uninstall sut-status k6-test k6-smoke k6-search-smoke k6-account-smoke k6-regression k6-build-image k6-uninstall k6-list perf-test perf-smoke
