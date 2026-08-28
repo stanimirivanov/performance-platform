@@ -2,8 +2,8 @@
 
 ## 1. Executive Summary
 
-This proposal defines a production-grade **Continuous Performance Engineering
-Platform** for an on-premises Kubernetes environment.
+This proposal defines a **Continuous Performance Engineering Platform** proof 
+of concept for an on-premises Kubernetes environment.
 
 The platform will automate and continuously improve performance validation for
 two primary workload categories:
