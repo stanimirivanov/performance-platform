@@ -1,0 +1,24 @@
+# platform/config/prod.yaml
+# Production environment
+
+auto_detect: true
+timeout_seconds: 30
+
+environment_config:
+  cluster: 'prod-cluster'
+  kubernetes:
+    version: 'v1.27.0'
+    nodeCount: 10
+  runtime:
+    containerRuntime: 'containerd'
+    cni: 'cilium'
+    storageClass: 'ssd'
+    kernel: null
+  application:
+    configurationHash: null
+    feature_flags:
+      debug: false
+      trace: false
+
+fingerprint_excludes:
+  - 'prod'

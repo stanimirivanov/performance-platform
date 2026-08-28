@@ -1,0 +1,11 @@
+# Base configuration shared across all environments
+
+auto_detect: true
+timeout_seconds: 30
+fingerprint_excludes: []
+
+environment_config:
+  runtime:
+    kernel: null
+  application:
+    feature_flags: {}

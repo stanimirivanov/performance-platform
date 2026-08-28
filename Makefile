@@ -86,6 +86,19 @@ infra-upgrade: ## Upgrade infrastructure
 infra-uninstall: ## Uninstall infrastructure
 	helm uninstall perfeng-infra
 
+.PHONY: port-forward apply-migrations reset-migrations
+
+port-forward:
+	kubectl port-forward -n metadata-db svc/postgres-service 5432:5432
+
+apply-migrations: ## Apply database migrations
+	@echo "Make sure PostgreSQL is port-forwarded (run 'make port-forward' in another terminal)"
+	cd platform && uv run python scripts/run_migrations.py
+
+reset-migrations: ## Reset database migrations
+	@echo "Make sure PostgreSQL is port-forwarded (run 'make port-forward' in another terminal)"
+	cd platform && uv run python scripts/run_migrations.py --reset
+
 # --- k6 Tests ---
 .PHONY: sut-install sut-uninstall sut-status k6-test k6-smoke k6-search-smoke k6-account-smoke k6-regression k6-build-image k6-uninstall k6-list perf-test perf-smoke
 

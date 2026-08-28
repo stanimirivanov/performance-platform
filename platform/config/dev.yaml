@@ -1,0 +1,24 @@
+# Development cluster environment
+
+auto_detect: true
+timeout_seconds: 30
+
+environment_config:
+  cluster: 'dev-cluster'
+  kubernetes:
+    version: 'v1.27.0'
+    nodeCount: 3
+  runtime:
+    containerRuntime: 'containerd'
+    cni: 'calico'
+    storageClass: 'standard'
+    kernel: null
+  application:
+    configurationHash: null
+    feature_flags:
+      debug: false
+      trace: false
+
+fingerprint_excludes:
+  - 'dev'
+  - 'test'

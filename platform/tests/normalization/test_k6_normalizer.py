@@ -11,7 +11,7 @@ from perfeng.normalizer import K6Normalizer
 
 def load_json(name: str) -> dict[str, Any]:
     """Load a JSON file from examples."""
-    path = Path(__file__).parent.parent.parent / "examples" / "k6" / name
+    path = Path(__file__).parent.parent.parent.parent / "examples" / "k6" / name
     with open(path) as f:
         return cast(dict[str, Any], json.load(f))
 

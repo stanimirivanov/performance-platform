@@ -8,6 +8,8 @@ import pytest
 
 from perfeng.utils.run_id import generate_run_id, parse_run_id
 
+pytestmark = pytest.mark.core
+
 
 def test_generate_run_id_format() -> None:
     """Test that generated run ID has correct format."""

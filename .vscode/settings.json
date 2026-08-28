@@ -11,14 +11,15 @@
     "source.organizeImports": "explicit"
   },
   "files.associations": {
-    "**/templates/**/*.yaml": "helm",
-    "**/templates/**/*.yml": "helm",
-    "**/templates/**/*.tpl": "helm",
+    "**/templates/**": "helm",
+    "**/*.tpl": "helm",
     "**/*.yaml.gotmpl": "helm",
     "**/*.yml.gotmpl": "helm"
   },
   "[helm]": {
-    "editor.formatOnSave": false
+    "editor.defaultFormatter": null,
+    "editor.formatOnSave": false,
+    "editor.formatOnType": false
   },
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff",
@@ -32,5 +33,16 @@
     "**/*.egg-info": true
   },
   "python.analysis.autoImportCompletions": true,
-  "python.analysis.completeFunctionParens": true
+  "python.analysis.completeFunctionParens": true,
+
+  "[sql]": {
+    "editor.defaultFormatter": "bradymholt.pgformatter",
+    "editor.formatOnSave": false
+  },
+
+  "pgFormatter.spaces": 4,
+  "pgFormatter.tabs": false,
+  "pgFormatter.keywordCase": "uppercase",
+  "pgFormatter.typeCase": "uppercase",
+  "pgFormatter.functionCase": "lowercase"
 }

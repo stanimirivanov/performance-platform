@@ -7,14 +7,18 @@ license = { text = "Apache 2.0" }
 requires-python = ">=3.11"
 dependencies = [
     "alembic>=1.19.1",
+    "asyncpg>=0.31.0",
     "boto3>=1.43.78",
+    "docker>=7.2.0",
     "fastapi>=0.141.1",
     "httpx>=0.28.1",
     "jsonschema>=4.26.0",
+    "psutil>=7.2.2",
     "psycopg2-binary>=2.9.12",
     "pydantic>=2.13.4",
     "python-dateutil>=2.9.0.post0",
     "pyyaml>=6.0.3",
+    "requests>=2.34.2",
     "sqlalchemy>=2.0.52",
     "tenacity>=9.1.4",
     "typer>=0.27.1",
@@ -58,16 +62,39 @@ ignore = ["E501"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-addopts = "-ra -q --strict-markers --strict-config"
+addopts = "-ra -q --cov=perfeng --cov-report=term-missing --cov-report=html"
 asyncio_mode = "auto"
+markers = [
+    "metadata: Metadata collection tests",
+    "normalization: Data normalization tests",
+    "core: Core functionality tests",
+    "integration: Integration tests (requires external dependencies)",
+    "unit: Unit tests (fast, no external dependencies)",
+    "slow: Slow running tests",
+    "requires_kubectl: Tests that require kubectl",
+    "requires_psutil: Tests that require psutil",
+]
 
 [tool.coverage.run]
-source = ["src/pricepilot"]
-omit = ["*/tests/*", "*/test_*.py"]
+source = ["src/perfeng"]
+omit = [
+    "tests/*",
+    "*/generated/*",
+    "*/scripts/*",
+    "*/examples/*",
+]
 
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
 
 [tool.mypy]
 python_version = "3.11"
