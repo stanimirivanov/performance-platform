@@ -1,7 +1,13 @@
 """Storage service for performance run metadata."""
 
 from .database import get_session
-from .models import CorrelationEvent, DataArtifact, Environment, ResourceSnapshot, TestRun
+from .generated_models import (
+    CorrelationEvents,
+    DataArtifacts,
+    Environments,
+    ResourceSnapshots,
+    TestRuns,
+)
 from .repositories import (
     ArtifactRepository,
     EnvironmentRepository,
@@ -26,11 +32,11 @@ from .services import ArtifactService, EventService, RunService, SnapshotService
 
 __all__ = [
     "get_session",
-    "TestRun",
-    "Environment",
-    "ResourceSnapshot",
-    "CorrelationEvent",
-    "DataArtifact",
+    "TestRuns",
+    "Environments",
+    "ResourceSnapshots",
+    "CorrelationEvents",
+    "DataArtifacts",
     "RunCreate",
     "RunUpdate",
     "RunResponse",

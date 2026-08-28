@@ -1,9 +1,9 @@
 """Database engine and session management."""
 
-from collections.abc import AsyncGenerator
 import os
+from collections.abc import AsyncGenerator
+
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import declarative_base
 
 DATABASE_URL = os.environ.get(
     "DATABASE_URL", "postgresql+asyncpg://test_user:test_password@localhost:5432/metadata"
@@ -21,8 +21,6 @@ AsyncSessionLocal = async_sessionmaker(
     class_=AsyncSession,
     expire_on_commit=False,
 )
-
-Base = declarative_base()
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:

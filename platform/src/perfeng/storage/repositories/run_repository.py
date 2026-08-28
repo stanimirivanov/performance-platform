@@ -7,27 +7,27 @@ from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from perfeng.storage.models import Environment, TestRun
+from perfeng.storage.models import Environments, TestRuns
 from perfeng.storage.repositories.base import BaseRepository
 from perfeng.storage.schemas import RunCreate, RunUpdate
 
 
-class RunRepository(BaseRepository[TestRun, RunCreate]):
+class RunRepository(BaseRepository[TestRuns, RunCreate]):
     """Repository for TestRun operations."""
 
     def __init__(self, session: AsyncSession):
-        super().__init__(TestRun, session)
+        super().__init__(TestRuns, session)
 
-    async def get_by_id(self, run_id: UUID) -> TestRun | None:
+    async def get_by_id(self, run_id: UUID) -> TestRuns | None:
         """Get run by ID with eager loading of environment."""
         result = await self.session.execute(
-            select(TestRun)
-            .options(selectinload(TestRun.environment))
-            .where(TestRun.run_id == run_id)
+            select(TestRuns)
+            .options(selectinload(TestRuns.environment))
+            .where(TestRuns.run_id == run_id)
         )
         return result.scalar_one_or_none()
 
-    async def update(self, run_id: UUID, update_data: RunUpdate) -> TestRun | None:
+    async def update(self, run_id: UUID, update_data: RunUpdate) -> TestRuns | None:
         """Update a run."""
         run = await self.get_by_id(run_id)
         if not run:
@@ -46,27 +46,27 @@ class RunRepository(BaseRepository[TestRun, RunCreate]):
         fingerprint: str | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> list[TestRun]:
+    ) -> list[TestRuns]:
         """List runs with advanced filters."""
-        query = select(TestRun)
+        query = select(TestRuns)
         conditions = []
 
         if status:
-            conditions.append(TestRun.status == status)
+            conditions.append(TestRuns.status == status)
         if test_name:
-            conditions.append(TestRun.test_name.ilike(f"%{test_name}%"))
+            conditions.append(TestRuns.test_name.ilike(f"%{test_name}%"))
         if start_date:
-            conditions.append(TestRun.start_time >= start_date)
+            conditions.append(TestRuns.start_time >= start_date)
         if end_date:
-            conditions.append(TestRun.start_time <= end_date)
+            conditions.append(TestRuns.start_time <= end_date)
 
         if fingerprint:
-            query = query.join(TestRun.environment)
-            conditions.append(Environment.fingerprint_hash == fingerprint)
+            query = query.join(TestRuns.environment)
+            conditions.append(Environments.fingerprint_hash == fingerprint)
 
         if conditions:
             query = query.where(and_(*conditions))
 
-        query = query.order_by(TestRun.start_time.desc()).limit(limit).offset(offset)
+        query = query.order_by(TestRuns.start_time.desc()).limit(limit).offset(offset)
         result = await self.session.execute(query)
         return list(result.scalars().all())

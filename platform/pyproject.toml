@@ -34,6 +34,7 @@ dev = [
     "pytest-asyncio>=1.4.0",
     "pytest-cov>=7.1.0",
     "ruff>=0.16.4",
+    "sqlacodegen>=4.0.4",
     "types-jsonschema>=4.26.0.20260518",
 ]
 
