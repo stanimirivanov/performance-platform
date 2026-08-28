@@ -1,49 +1,14 @@
 # Continuous Performance Engineering Platform
 
-A production-grade platform for automated performance validation, regression
-detection, and continuous performance engineering.
+A platform for automated performance validation, regression detection, and 
+continuous performance engineering.
 
 For more background, read the AI assisted research:
 
 - [Continuous Performance Engineering - Research](docs/research.md)
 - [Continuous Performance Engineering - Platform Proposal](docs/project-proposal.md)
 
-We are going to implement a POC of the above research.
-
-## Quick Start
-
-### Prerequisites
-
-- Python 3.11+
-- Node.js 20+
-- pnpm 8+
-- k6 (for running load tests)
-- Docker (for local Kubernetes)
-
-## Local Development Setup
-
-### Prerequisites
-
-- Docker Desktop
-- kind
-- kubectl
-- Helm 3+
-
-### Quick Start
-
-```bash
-# 1. Create cluster
-make cluster-up
-
-# 2. Install infrastructure
-make infra-install
-
-# 3. Install sample SUT
-make sut-install
-
-# 4. Run a smoke test
-make k6-search-smoke
-````
+We are going to implement a proof of concept of the above research.
 
 ## Documentation
 
