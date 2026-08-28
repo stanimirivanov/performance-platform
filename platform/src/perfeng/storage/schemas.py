@@ -1,7 +1,7 @@
 """Pydantic schemas for API requests and responses."""
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -61,4 +61,135 @@ class RunResponse(BaseModel):
     total_requests: int | None = None
     created_at: datetime
     updated_at: datetime
-    environment: Optional["EnvironmentResponse"] = None
+
+
+# === Environment schemas ===
+
+
+class EnvironmentCreate(BaseModel):
+    cluster_name: str | None = None
+    cluster_type: str | None = None
+    kubernetes_version: str | None = None
+    cloud_provider: str | None = None
+    cloud_region: str | None = None
+    cloud_zone: str | None = None
+    node_count: int | None = None
+    node_os: str | None = None
+    node_kernel: str | None = None
+    node_architecture: str | None = None
+    node_resource_capacity: dict[str, Any] | None = None
+    fingerprint_hash: str
+
+
+class EnvironmentResponse(BaseModel):
+    environment_id: UUID
+    run_id: UUID
+    cluster_name: str | None = None
+    cluster_type: str | None = None
+    kubernetes_version: str | None = None
+    cloud_provider: str | None = None
+    cloud_region: str | None = None
+    cloud_zone: str | None = None
+    node_count: int | None = None
+    node_os: str | None = None
+    node_kernel: str | None = None
+    node_architecture: str | None = None
+    node_resource_capacity: dict[str, Any] | None = None
+    fingerprint_hash: str
+    created_at: datetime
+
+
+# === Snapshot schemas ===
+
+
+class SnapshotCreate(BaseModel):
+    resource_type: str
+    node_name: str | None = None
+    namespace: str | None = None
+    pod_name: str | None = None
+    container_name: str | None = None
+    value_min: float | None = None
+    value_max: float | None = None
+    value_avg: float | None = None
+    value_current: float | None = None
+    unit: str | None = None
+    test_phase: str | None = None
+    time_elapsed_seconds: int | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class SnapshotResponse(BaseModel):
+    snapshot_id: UUID
+    run_id: UUID
+    resource_type: str
+    node_name: str | None = None
+    namespace: str | None = None
+    pod_name: str | None = None
+    container_name: str | None = None
+    value_min: float | None = None
+    value_max: float | None = None
+    value_avg: float | None = None
+    value_current: float | None = None
+    unit: str | None = None
+    snapshot_time: datetime
+    test_phase: str | None = None
+    time_elapsed_seconds: int | None = None
+    metadata: dict[str, Any] | None = None
+
+
+# === Event schemas ===
+
+
+class EventCreate(BaseModel):
+    event_type: str
+    phase_name: str | None = None
+    description: str | None = None
+    tags: list[str] | None = None
+    metadata: dict[str, Any] | None = None
+    sequence_number: int | None = None
+    parent_event_id: UUID | None = None
+
+
+class EventResponse(BaseModel):
+    event_id: UUID
+    run_id: UUID
+    event_type: str
+    phase_name: str | None = None
+    event_time: datetime
+    description: str | None = None
+    tags: list[str] | None = None
+    metadata: dict[str, Any] | None = None
+    sequence_number: int | None = None
+    parent_event_id: UUID | None = None
+
+
+# === Artifact schemas ===
+
+
+class ArtifactCreate(BaseModel):
+    artifact_type: str
+    data_type: str  # 'baseline', 'current', etc.
+    storage_path: str | None = None
+    storage_uri: str | None = None
+    storage_backend: str | None = "local"
+    data_size_bytes: int | None = None
+    checksum: str | None = None
+    file_format: str | None = None
+    description: str | None = None
+    tags: list[str] | None = None
+
+
+class ArtifactResponse(BaseModel):
+    artifact_id: UUID
+    run_id: UUID
+    artifact_type: str
+    data_type: str
+    storage_path: str | None = None
+    storage_uri: str | None = None
+    storage_backend: str | None = None
+    data_size_bytes: int | None = None
+    checksum: str | None = None
+    file_format: str | None = None
+    description: str | None = None
+    tags: list[str] | None = None
+    created_at: datetime

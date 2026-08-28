@@ -1,13 +1,27 @@
-"""Routes for run operations."""
+"""Run routes - HTTP layer that imports services from storage."""
 
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...storage import RunCreate, RunService, RunUpdate
-from ..dependencies import get_run_service
+from ...storage import (
+    EnvironmentRepository,
+    RunCreate,
+    RunRepository,
+    RunService,
+    RunUpdate,
+    get_session,
+)
 
 router = APIRouter(prefix="/api/v1/runs", tags=["runs"])
+
+
+def get_run_service(session: AsyncSession = Depends(get_session)) -> RunService:
+    """Dependency injection for RunService."""
+    run_repo = RunRepository(session)
+    env_repo = EnvironmentRepository(session)
+    return RunService(run_repo, env_repo)
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
@@ -16,6 +30,8 @@ async def create_run(
     service: RunService = Depends(get_run_service),
 ):
     """Create a new run."""
+    # Optionally include environment data if provided
+    # For simplicity, we just create the run; environment can be added separately
     result = await service.create_run(run_data)
     return result
 
@@ -25,7 +41,7 @@ async def get_run(
     run_id: UUID,
     service: RunService = Depends(get_run_service),
 ):
-    """Get a run by ID."""
+    """Get a run by ID with its environment."""
     run = await service.get_run(run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
@@ -57,6 +73,7 @@ async def list_runs(
     service: RunService = Depends(get_run_service),
 ):
     """List runs with filters."""
-    return await service.list_runs(
+    runs = await service.list_runs(
         status, test_name, start_date, end_date, fingerprint, limit, offset
     )
+    return runs

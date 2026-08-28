@@ -23,17 +23,21 @@ class RunService:
     ) -> dict[str, Any]:
         """Create a new run with optional environment."""
         run = await self.run_repo.create(run_data)
+        result = {"run_id": run.run_id}
         if environment_data:
-            env = await self.env_repo.create(run.run_id, environment_data)
-        else:
-            env = None
-        return {"run_id": run.run_id, "environment": env}
+            env = await self.env_repo.create_for_run(run.run_id, environment_data)
+            result["environment_id"] = env.environment_id
+        return result
 
     async def get_run(self, run_id: UUID) -> dict[str, Any] | None:
         """Get a run with environment."""
-        return await self.run_repo.get_with_environment(run_id)
+        run = await self.run_repo.get_by_id(run_id)
+        if not run:
+            return None
+        env = await self.env_repo.get_by_run(run_id)
+        return {"run": run, "environment": env}
 
-    async def update_run(self, run_id: UUID, update_data: RunUpdate) -> dict | None:
+    async def update_run(self, run_id: UUID, update_data: RunUpdate) -> TestRun | None:
         """Update a run."""
         return await self.run_repo.update(run_id, update_data)
 
@@ -46,7 +50,7 @@ class RunService:
         fingerprint: str | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> list[dict]:
+    ) -> list[TestRun]:
         """List runs with filters."""
         return await self.run_repo.list_with_filters(
             status, test_name, start_date, end_date, fingerprint, limit, offset
