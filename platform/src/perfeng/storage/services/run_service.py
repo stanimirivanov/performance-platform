@@ -25,7 +25,9 @@ class RunService:
         run = await self.run_repo.create(run_data)
         if environment_data:
             env = await self.env_repo.create(run.run_id, environment_data)
-        return {"run_id": run.run_id, "environment": env if environment_data else None}
+        else:
+            env = None
+        return {"run_id": run.run_id, "environment": env}
 
     async def get_run(self, run_id: UUID) -> dict[str, Any] | None:
         """Get a run with environment."""

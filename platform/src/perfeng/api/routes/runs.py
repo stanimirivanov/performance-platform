@@ -1,22 +1,13 @@
-"""Run routes."""
+"""Routes for run operations."""
+
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..database import get_session
-from ..repositories.environment_repository import EnvironmentRepository
-from ..repositories.run_repository import RunRepository
-from ..schemas import RunCreate, RunUpdate
-from ..services.run_service import RunService
+from ...storage import RunCreate, RunService, RunUpdate
+from ..dependencies import get_run_service
 
 router = APIRouter(prefix="/api/v1/runs", tags=["runs"])
-
-
-def get_run_service(session: AsyncSession = Depends(get_session)) -> RunService:
-    """Dependency injection for RunService."""
-    run_repo = RunRepository(session)
-    env_repo = EnvironmentRepository(session)
-    return RunService(run_repo, env_repo)
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)

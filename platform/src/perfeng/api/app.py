@@ -1,31 +1,16 @@
-"""
-FastAPI application factory for the metadata storage service.
-"""
-
-from contextlib import asynccontextmanager
+"""FastAPI application factory."""
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .database import DatabaseRepository
-from .routes import router
+from .routes import runs_router
 
 
-def create_app(dsn: str | None = None) -> FastAPI:
-    """Application factory with dependency injection."""
-    repo = DatabaseRepository(dsn)
-
-    @asynccontextmanager
-    async def lifespan(app: FastAPI):
-        await repo.connect()
-        yield
-        await repo.close()
-
+def create_app() -> FastAPI:
     app = FastAPI(
         title="PerfEng Metadata Storage Service",
         version="1.0.0",
         description="Store and retrieve performance test run metadata.",
-        lifespan=lifespan,
     )
 
     app.add_middleware(
@@ -36,5 +21,5 @@ def create_app(dsn: str | None = None) -> FastAPI:
         allow_headers=["*"],
     )
 
-    app.include_router(router)
+    app.include_router(runs_router)
     return app
