@@ -1,10 +1,9 @@
 """Artifact service."""
 
-from typing import Any
 from uuid import UUID
 
-from ..repositories.artifact_repository import ArtifactRepository
-from ..schemas import ArtifactCreate
+from perfeng.storage.repositories.artifact_repository import ArtifactRepository
+from perfeng.storage.schemas import ArtifactCreate, ArtifactResponse
 
 
 class ArtifactService:
@@ -17,10 +16,10 @@ class ArtifactService:
         self,
         run_id: UUID,
         artifact_data: ArtifactCreate,
-    ) -> dict[str, Any]:
+    ) -> ArtifactResponse:
         """Create a new artifact for a run."""
         artifact = await self.artifact_repo.create_for_run(run_id, artifact_data)
-        return {"artifact_id": artifact.artifact_id}
+        return ArtifactResponse.model_validate(artifact)
 
     async def list_artifacts(
         self,
@@ -28,6 +27,7 @@ class ArtifactService:
         data_type: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> list[DataArtifact]:
+    ) -> list[ArtifactResponse]:
         """List artifacts for a run."""
-        return await self.artifact_repo.list_by_run(run_id, data_type, limit, offset)
+        artifacts = await self.artifact_repo.list_by_run(run_id, data_type, limit, offset)
+        return [ArtifactResponse.model_validate(a) for a in artifacts]

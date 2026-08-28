@@ -1,7 +1,7 @@
 """Database engine and session management."""
 
+from collections.abc import AsyncGenerator
 import os
-
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import declarative_base
 
@@ -25,7 +25,12 @@ AsyncSessionLocal = async_sessionmaker(
 Base = declarative_base()
 
 
-async def get_session() -> AsyncSession:
-    """FastAPI dependency for database session."""
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    """FastAPI dependency that yields a session and commits on success."""
     async with AsyncSessionLocal() as session:
-        yield session
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise

@@ -1,10 +1,9 @@
 """Snapshot service."""
 
-from typing import Any
 from uuid import UUID
 
-from ..repositories.snapshot_repository import SnapshotRepository
-from ..schemas import SnapshotCreate
+from perfeng.storage.repositories.snapshot_repository import SnapshotRepository
+from perfeng.storage.schemas import SnapshotCreate, SnapshotResponse
 
 
 class SnapshotService:
@@ -17,10 +16,10 @@ class SnapshotService:
         self,
         run_id: UUID,
         snapshot_data: SnapshotCreate,
-    ) -> dict[str, Any]:
+    ) -> SnapshotResponse:
         """Create a new snapshot for a run."""
         snapshot = await self.snapshot_repo.create_for_run(run_id, snapshot_data)
-        return {"snapshot_id": snapshot.snapshot_id}
+        return SnapshotResponse.model_validate(snapshot)
 
     async def list_snapshots(
         self,
@@ -28,6 +27,7 @@ class SnapshotService:
         resource_type: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> list[ResourceSnapshot]:
+    ) -> list[SnapshotResponse]:
         """List snapshots for a run."""
-        return await self.snapshot_repo.list_by_run(run_id, resource_type, limit, offset)
+        snapshots = await self.snapshot_repo.list_by_run(run_id, resource_type, limit, offset)
+        return [SnapshotResponse.model_validate(s) for s in snapshots]

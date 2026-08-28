@@ -1,28 +1,25 @@
 """Run repository with specialized queries."""
 
 from datetime import datetime
-from typing import Any
 from uuid import UUID
 
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from ..models import Environment, TestRun
-from ..schemas import RunCreate, RunUpdate
-from .base import BaseRepository
+from perfeng.storage.models import Environment, TestRun
+from perfeng.storage.repositories.base import BaseRepository
+from perfeng.storage.schemas import RunCreate, RunUpdate
 
 
-class RunRepository(BaseRepository[TestRun, RunCreate, RunUpdate]):
+class RunRepository(BaseRepository[TestRun, RunCreate]):
     """Repository for TestRun operations."""
 
     def __init__(self, session: AsyncSession):
         super().__init__(TestRun, session)
-        # Set the ID field name for the base repository
-        self.model.id = TestRun.run_id  # type: ignore
 
     async def get_by_id(self, run_id: UUID) -> TestRun | None:
-        """Get run by ID with eager loading."""
+        """Get run by ID with eager loading of environment."""
         result = await self.session.execute(
             select(TestRun)
             .options(selectinload(TestRun.environment))
@@ -30,12 +27,15 @@ class RunRepository(BaseRepository[TestRun, RunCreate, RunUpdate]):
         )
         return result.scalar_one_or_none()
 
-    async def get_with_environment(self, run_id: UUID) -> dict[str, Any] | None:
-        """Get run with environment as a dict."""
+    async def update(self, run_id: UUID, update_data: RunUpdate) -> TestRun | None:
+        """Update a run."""
         run = await self.get_by_id(run_id)
         if not run:
             return None
-        return {"run": run, "environment": run.environment}
+        for key, value in update_data.model_dump(exclude_unset=True).items():
+            setattr(run, key, value)
+        await self.session.flush()
+        return run
 
     async def list_with_filters(
         self,
@@ -60,7 +60,6 @@ class RunRepository(BaseRepository[TestRun, RunCreate, RunUpdate]):
         if end_date:
             conditions.append(TestRun.start_time <= end_date)
 
-        # fingerprint filter requires join with environment
         if fingerprint:
             query = query.join(TestRun.environment)
             conditions.append(Environment.fingerprint_hash == fingerprint)

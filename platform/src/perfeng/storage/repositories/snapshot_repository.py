@@ -5,17 +5,16 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import ResourceSnapshot
-from ..schemas import SnapshotCreate
-from .base import BaseRepository
+from perfeng.storage.models import ResourceSnapshot
+from perfeng.storage.repositories.base import BaseRepository
+from perfeng.storage.schemas import SnapshotCreate
 
 
-class SnapshotRepository(BaseRepository[ResourceSnapshot, SnapshotCreate, None]):
+class SnapshotRepository(BaseRepository[ResourceSnapshot, SnapshotCreate]):
     """Repository for ResourceSnapshot operations."""
 
     def __init__(self, session: AsyncSession):
         super().__init__(ResourceSnapshot, session)
-        self.model.id = ResourceSnapshot.snapshot_id  # type: ignore
 
     async def create_for_run(self, run_id: UUID, snapshot_data: SnapshotCreate) -> ResourceSnapshot:
         """Create a snapshot for a specific run."""

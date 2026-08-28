@@ -1,79 +1,59 @@
-"""Run routes - HTTP layer that imports services from storage."""
+"""Run routes."""
 
+from datetime import datetime
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, HTTPException, Query, status
 
-from ...storage import (
-    EnvironmentRepository,
+from perfeng.api.dependencies import RunServiceDep
+from perfeng.storage.schemas import (
+    EnvironmentCreate,
     RunCreate,
-    RunRepository,
-    RunService,
+    RunCreateResponse,
+    RunResponse,
     RunUpdate,
-    get_session,
 )
 
 router = APIRouter(prefix="/api/v1/runs", tags=["runs"])
 
 
-def get_run_service(session: AsyncSession = Depends(get_session)) -> RunService:
-    """Dependency injection for RunService."""
-    run_repo = RunRepository(session)
-    env_repo = EnvironmentRepository(session)
-    return RunService(run_repo, env_repo)
-
-
-@router.post("/", status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=RunCreateResponse, status_code=status.HTTP_201_CREATED)
 async def create_run(
     run_data: RunCreate,
-    service: RunService = Depends(get_run_service),
+    service: RunServiceDep,
+    environment: EnvironmentCreate | None = None,
 ):
-    """Create a new run."""
-    # Optionally include environment data if provided
-    # For simplicity, we just create the run; environment can be added separately
-    result = await service.create_run(run_data)
-    return result
+    return await service.create_run(run_data, environment)
 
 
-@router.get("/{run_id}")
-async def get_run(
-    run_id: UUID,
-    service: RunService = Depends(get_run_service),
-):
-    """Get a run by ID with its environment."""
+@router.get("/{run_id}", response_model=RunResponse)
+async def get_run(run_id: UUID, service: RunServiceDep):
     run = await service.get_run(run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
     return run
 
 
-@router.patch("/{run_id}")
-async def update_run(
-    run_id: UUID,
-    update_data: RunUpdate,
-    service: RunService = Depends(get_run_service),
-):
-    """Update a run."""
+@router.patch("/{run_id}", response_model=RunResponse)
+async def update_run(run_id: UUID, update_data: RunUpdate, service: RunServiceDep):
     updated = await service.update_run(run_id, update_data)
     if not updated:
         raise HTTPException(status_code=404, detail="Run not found")
     return updated
 
 
-@router.get("/")
+@router.get("/", response_model=list[RunResponse])
 async def list_runs(
-    status: str | None = Query(None),
-    test_name: str | None = Query(None),
-    start_date: datetime | None = Query(None),
-    end_date: datetime | None = Query(None),
-    fingerprint: str | None = Query(None),
-    limit: int = Query(50, ge=1, le=100),
-    offset: int = Query(0, ge=0),
-    service: RunService = Depends(get_run_service),
+    service: RunServiceDep,
+    status: Annotated[str | None, Query()] = None,
+    test_name: Annotated[str | None, Query()] = None,
+    start_date: Annotated[datetime | None, Query()] = None,
+    end_date: Annotated[datetime | None, Query()] = None,
+    fingerprint: Annotated[str | None, Query()] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ):
-    """List runs with filters."""
-    runs = await service.list_runs(
+    return await service.list_runs(
         status, test_name, start_date, end_date, fingerprint, limit, offset
     )
-    return runs

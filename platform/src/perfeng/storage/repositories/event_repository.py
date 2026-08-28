@@ -5,17 +5,16 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import CorrelationEvent
-from ..schemas import EventCreate
-from .base import BaseRepository
+from perfeng.storage.models import CorrelationEvent
+from perfeng.storage.repositories.base import BaseRepository
+from perfeng.storage.schemas import EventCreate
 
 
-class EventRepository(BaseRepository[CorrelationEvent, EventCreate, None]):
+class EventRepository(BaseRepository[CorrelationEvent, EventCreate]):
     """Repository for CorrelationEvent operations."""
 
     def __init__(self, session: AsyncSession):
         super().__init__(CorrelationEvent, session)
-        self.model.id = CorrelationEvent.event_id  # type: ignore
 
     async def create_for_run(self, run_id: UUID, event_data: EventCreate) -> CorrelationEvent:
         """Create an event for a specific run."""

@@ -5,17 +5,16 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import Environment
-from ..schemas import EnvironmentCreate
-from .base import BaseRepository
+from perfeng.storage.models import Environment
+from perfeng.storage.repositories.base import BaseRepository
+from perfeng.storage.schemas import EnvironmentCreate
 
 
-class EnvironmentRepository(BaseRepository[Environment, EnvironmentCreate, None]):
+class EnvironmentRepository(BaseRepository[Environment, EnvironmentCreate]):
     """Repository for Environment operations."""
 
     def __init__(self, session: AsyncSession):
         super().__init__(Environment, session)
-        self.model.id = Environment.environment_id  # type: ignore
 
     async def create_for_run(self, run_id: UUID, env_data: EnvironmentCreate) -> Environment:
         """Create an environment for a specific run."""

@@ -5,17 +5,16 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import DataArtifact
-from ..schemas import ArtifactCreate
-from .base import BaseRepository
+from perfeng.storage.models import DataArtifact
+from perfeng.storage.repositories.base import BaseRepository
+from perfeng.storage.schemas import ArtifactCreate
 
 
-class ArtifactRepository(BaseRepository[DataArtifact, ArtifactCreate, None]):
+class ArtifactRepository(BaseRepository[DataArtifact, ArtifactCreate]):
     """Repository for DataArtifact operations."""
 
     def __init__(self, session: AsyncSession):
         super().__init__(DataArtifact, session)
-        self.model.id = DataArtifact.artifact_id  # type: ignore
 
     async def create_for_run(self, run_id: UUID, artifact_data: ArtifactCreate) -> DataArtifact:
         """Create an artifact for a specific run."""

@@ -1,10 +1,9 @@
 """Event service."""
 
-from typing import Any
 from uuid import UUID
 
-from ..repositories.event_repository import EventRepository
-from ..schemas import EventCreate
+from perfeng.storage.repositories.event_repository import EventRepository
+from perfeng.storage.schemas import EventCreate, EventResponse
 
 
 class EventService:
@@ -17,10 +16,10 @@ class EventService:
         self,
         run_id: UUID,
         event_data: EventCreate,
-    ) -> dict[str, Any]:
+    ) -> EventResponse:
         """Create a new event for a run."""
         event = await self.event_repo.create_for_run(run_id, event_data)
-        return {"event_id": event.event_id}
+        return EventResponse.model_validate(event)
 
     async def list_events(
         self,
@@ -29,6 +28,7 @@ class EventService:
         phase_name: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> list[CorrelationEvent]:
+    ) -> list[EventResponse]:
         """List events for a run."""
-        return await self.event_repo.list_by_run(run_id, event_type, phase_name, limit, offset)
+        events = await self.event_repo.list_by_run(run_id, event_type, phase_name, limit, offset)
+        return [EventResponse.model_validate(e) for e in events]

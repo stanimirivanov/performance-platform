@@ -4,7 +4,44 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+
+# === Environment schemas ===
+
+
+class EnvironmentCreate(BaseModel):
+    cluster_name: str | None = None
+    cluster_type: str | None = None
+    kubernetes_version: str | None = None
+    cloud_provider: str | None = None
+    cloud_region: str | None = None
+    cloud_zone: str | None = None
+    node_count: int | None = None
+    node_os: str | None = None
+    node_kernel: str | None = None
+    node_architecture: str | None = None
+    node_resource_capacity: dict[str, Any] | None = None
+    fingerprint_hash: str
+
+
+class EnvironmentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    environment_id: UUID
+    run_id: UUID
+    cluster_name: str | None = None
+    cluster_type: str | None = None
+    kubernetes_version: str | None = None
+    cloud_provider: str | None = None
+    cloud_region: str | None = None
+    cloud_zone: str | None = None
+    node_count: int | None = None
+    node_os: str | None = None
+    node_kernel: str | None = None
+    node_architecture: str | None = None
+    node_resource_capacity: dict[str, Any] | None = None
+    fingerprint_hash: str
+    created_at: datetime
+
 
 # === Run schemas ===
 
@@ -37,6 +74,7 @@ class RunUpdate(BaseModel):
 
 
 class RunResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     run_id: UUID
     test_name: str
     test_script: str | None = None
@@ -61,42 +99,12 @@ class RunResponse(BaseModel):
     total_requests: int | None = None
     created_at: datetime
     updated_at: datetime
+    environment: EnvironmentResponse | None = None
 
 
-# === Environment schemas ===
-
-
-class EnvironmentCreate(BaseModel):
-    cluster_name: str | None = None
-    cluster_type: str | None = None
-    kubernetes_version: str | None = None
-    cloud_provider: str | None = None
-    cloud_region: str | None = None
-    cloud_zone: str | None = None
-    node_count: int | None = None
-    node_os: str | None = None
-    node_kernel: str | None = None
-    node_architecture: str | None = None
-    node_resource_capacity: dict[str, Any] | None = None
-    fingerprint_hash: str
-
-
-class EnvironmentResponse(BaseModel):
-    environment_id: UUID
+class RunCreateResponse(BaseModel):
     run_id: UUID
-    cluster_name: str | None = None
-    cluster_type: str | None = None
-    kubernetes_version: str | None = None
-    cloud_provider: str | None = None
-    cloud_region: str | None = None
-    cloud_zone: str | None = None
-    node_count: int | None = None
-    node_os: str | None = None
-    node_kernel: str | None = None
-    node_architecture: str | None = None
-    node_resource_capacity: dict[str, Any] | None = None
-    fingerprint_hash: str
-    created_at: datetime
+    environment_id: UUID | None = None
 
 
 # === Snapshot schemas ===
@@ -119,6 +127,7 @@ class SnapshotCreate(BaseModel):
 
 
 class SnapshotResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     snapshot_id: UUID
     run_id: UUID
     resource_type: str
@@ -151,6 +160,7 @@ class EventCreate(BaseModel):
 
 
 class EventResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     event_id: UUID
     run_id: UUID
     event_type: str
@@ -180,6 +190,7 @@ class ArtifactCreate(BaseModel):
 
 
 class ArtifactResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     artifact_id: UUID
     run_id: UUID
     artifact_type: str
