@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from perfeng.storage.models import Environments, TestRuns
-from perfeng.storage.repositories import BaseRepository
+from perfeng.storage.repositories.base import BaseRepository
 from perfeng.storage.schemas import RunCreate, RunFilter, RunUpdate
 
 
