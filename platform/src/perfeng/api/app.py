@@ -3,10 +3,12 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi_injector import InjectorMiddleware, attach_injector
+from injector import Injector
 from sqlalchemy.exc import SQLAlchemyError
 
 from perfeng.api.routes import artifacts, events, runs, snapshots
-from perfeng.storage.database import engine
+from perfeng.ioc import AppModule
 
 
 def create_app() -> FastAPI:
@@ -34,18 +36,10 @@ def create_app() -> FastAPI:
             content={"detail": "Database error occurred."},
         )
 
-    # Simple DB health check
-    @app.get("/health/db")
-    async def health_db():
-        try:
-            async with engine.connect() as conn:
-                await conn.execute("SELECT 1")
-            return {"status": "healthy", "database": "connected"}
-        except Exception:
-            return JSONResponse(
-                status_code=503,
-                content={"status": "unhealthy", "database": "disconnected"},
-            )
+    # Set up IoC container
+    ioc_container = Injector([AppModule()])
+    app.add_middleware(InjectorMiddleware, injector=ioc_container)
+    attach_injector(app, ioc_container)
 
     # Include routers
     app.include_router(runs.router)

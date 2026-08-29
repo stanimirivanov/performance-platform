@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from perfeng.storage.models import CorrelationEvents
+from perfeng.storage.generated_models import CorrelationEvents
 from perfeng.storage.repositories.base import BaseRepository
 from perfeng.storage.schemas import EventCreate
 
