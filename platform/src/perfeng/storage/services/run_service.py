@@ -84,6 +84,7 @@ class RunService:
         offset: int = 0,
     ) -> list[RunResponse]:
         """List runs with filters, returning Pydantic models."""
+
         runs = await self.run_repo.list_with_filters(
             session, status, test_name, start_date, end_date, fingerprint, limit, offset
         )
