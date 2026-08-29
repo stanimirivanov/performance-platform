@@ -1,4 +1,4 @@
-"""Base repository with common read/create/list/delete operations."""
+"""Base repository with common read/create/list/delete operations (stateless)."""
 
 from typing import Any, Generic, TypeVar
 from uuid import UUID
@@ -12,11 +12,15 @@ CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
 
 
 class BaseRepository(Generic[ModelType, CreateSchemaType]):
-    """Base repository implementing common CRUD operations."""
+    """Base repository implementing common CRUD operations.
 
-    def __init__(self, model: type[ModelType], session: AsyncSession):
+    The repository is **stateless**,  it does not store an AsyncSession.
+    All methods that need database access require an explicit 'session'
+    parameter. This makes the repository thread‑safe and request‑scoped.
+    """
+
+    def __init__(self, model: type[ModelType]):
         self.model = model
-        self.session = session
 
         mapper = inspect(model)
         if mapper is None:
@@ -25,20 +29,29 @@ class BaseRepository(Generic[ModelType, CreateSchemaType]):
             raise ValueError("Repository supports only models with a single primary key column")
         self.pk_column = mapper.primary_key[0]
 
-    async def create(self, create_data: CreateSchemaType) -> ModelType:
+    async def create(
+        self,
+        session: AsyncSession,
+        create_data: CreateSchemaType,
+    ) -> ModelType:
         """Create a new record."""
         instance = self.model(**create_data.model_dump())
-        self.session.add(instance)
-        await self.session.flush()
+        session.add(instance)
+        await session.flush()
         return instance
 
-    async def get(self, id: UUID) -> ModelType | None:
+    async def get(
+        self,
+        session: AsyncSession,
+        id: UUID,
+    ) -> ModelType | None:
         """Get a record by primary key."""
-        result = await self.session.execute(select(self.model).where(self.pk_column == id))
+        result = await session.execute(select(self.model).where(self.pk_column == id))
         return result.scalar_one_or_none()
 
     async def list(
         self,
+        session: AsyncSession,
         filters: dict[str, Any] | None = None,
         limit: int = 50,
         offset: int = 0,
@@ -52,14 +65,18 @@ class BaseRepository(Generic[ModelType, CreateSchemaType]):
         if order_by:
             query = query.order_by(getattr(self.model, order_by).desc())
         query = query.limit(limit).offset(offset)
-        result = await self.session.execute(query)
+        result = await session.execute(query)
         return list(result.scalars().all())
 
-    async def delete(self, id: UUID) -> bool:
+    async def delete(
+        self,
+        session: AsyncSession,
+        id: UUID,
+    ) -> bool:
         """Delete a record by primary key."""
-        instance = await self.get(id)
+        instance = await self.get(session, id)
         if not instance:
             return False
-        await self.session.delete(instance)
-        await self.session.flush()
+        await session.delete(instance)
+        await session.flush()
         return True

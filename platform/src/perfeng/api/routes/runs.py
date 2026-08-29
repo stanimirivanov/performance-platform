@@ -4,10 +4,12 @@ from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi_class import View
 from fastapi_injector import Injected
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from perfeng.storage.database import get_session
 from perfeng.storage.schemas import (
     EnvironmentCreate,
     RunCreate,
@@ -27,21 +29,37 @@ class RunView:
     @router.post("/", response_model=RunCreateResponse, status_code=status.HTTP_201_CREATED)
     async def create_run(
         self,
+        session: Annotated[AsyncSession, Depends(get_session)],
         run_data: RunCreate,
         environment: EnvironmentCreate | None = None,
     ):
-        return await self.service.create_run(run_data, environment)
+        """Create a new run with optional environment."""
+
+        return await self.service.create_run(session, run_data, environment)
 
     @router.get("/{run_id}", response_model=RunResponse)
-    async def get_run(self, run_id: UUID):
-        run = await self.service.get_run(run_id)
+    async def get_run(
+        self,
+        session: Annotated[AsyncSession, Depends(get_session)],
+        run_id: UUID,
+    ):
+        """Get run by run id."""
+
+        run = await self.service.get_run(session, run_id)
         if not run:
             raise HTTPException(status_code=404, detail="Run not found")
         return run
 
     @router.patch("/{run_id}", response_model=RunResponse)
-    async def update_run(self, run_id: UUID, update_data: RunUpdate):
-        updated = await self.service.update_run(run_id, update_data)
+    async def update_run(
+        self,
+        session: Annotated[AsyncSession, Depends(get_session)],
+        run_id: UUID,
+        update_data: RunUpdate,
+    ):
+        """Update a run."""
+
+        updated = await self.service.update_run(session, run_id, update_data)
         if not updated:
             raise HTTPException(status_code=404, detail="Run not found")
         return updated
@@ -49,6 +67,7 @@ class RunView:
     @router.get("/", response_model=list[RunResponse])
     async def list_runs(
         self,
+        session: Annotated[AsyncSession, Depends(get_session)],
         status: Annotated[str | None, Query()] = None,
         test_name: Annotated[str | None, Query()] = None,
         start_date: Annotated[datetime | None, Query()] = None,
@@ -57,6 +76,7 @@ class RunView:
         limit: Annotated[int, Query(ge=1, le=100)] = 50,
         offset: Annotated[int, Query(ge=0)] = 0,
     ):
+        """List runs with filters."""
         return await self.service.list_runs(
-            status, test_name, start_date, end_date, fingerprint, limit, offset
+            session, status, test_name, start_date, end_date, fingerprint, limit, offset
         )

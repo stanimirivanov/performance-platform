@@ -1,4 +1,4 @@
-"""Correlation event repository."""
+"""Correlation event repository (stateless)."""
 
 from uuid import UUID
 
@@ -13,18 +13,25 @@ from perfeng.storage.schemas import EventCreate
 class EventRepository(BaseRepository[CorrelationEvents, EventCreate]):
     """Repository for CorrelationEvent operations."""
 
-    def __init__(self, session: AsyncSession):
-        super().__init__(CorrelationEvents, session)
+    def __init__(self):
+        super().__init__(CorrelationEvents)
 
-    async def create_for_run(self, run_id: UUID, event_data: EventCreate) -> CorrelationEvents:
+    async def create_for_run(
+        self,
+        session: AsyncSession,
+        run_id: UUID,
+        event_data: EventCreate,
+    ) -> CorrelationEvents:
         """Create an event for a specific run."""
+
         event = CorrelationEvents(run_id=run_id, **event_data.model_dump())
-        self.session.add(event)
-        await self.session.flush()
+        session.add(event)
+        await session.flush()
         return event
 
     async def list_by_run(
         self,
+        session: AsyncSession,
         run_id: UUID,
         event_type: str | None = None,
         phase_name: str | None = None,
@@ -32,11 +39,12 @@ class EventRepository(BaseRepository[CorrelationEvents, EventCreate]):
         offset: int = 0,
     ) -> list[CorrelationEvents]:
         """List events for a run with optional filters."""
+
         query = select(CorrelationEvents).where(CorrelationEvents.run_id == run_id)
         if event_type:
             query = query.where(CorrelationEvents.event_type == event_type)
         if phase_name:
             query = query.where(CorrelationEvents.phase_name == phase_name)
         query = query.order_by(CorrelationEvents.event_time.asc()).limit(limit).offset(offset)
-        result = await self.session.execute(query)
+        result = await session.execute(query)
         return list(result.scalars().all())
