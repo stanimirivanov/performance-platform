@@ -56,11 +56,13 @@ async def test_update_run(db_session: AsyncSession):
 @pytest.mark.asyncio
 async def test_list_with_filters(db_session: AsyncSession):
     repo = RunRepository()
-    env_repo = EnvironmentRepository()
 
     # Create multiple runs with different statuses and names
     for i in range(3):
-        run_data = RunCreate(test_name=f"run-{i}", status="completed" if i % 2 == 0 else "failed")
+        run_data = RunCreate(
+            test_name=f"run-{i}",
+            status="completed" if i % 2 == 0 else "failed",
+        )
         await repo.create(db_session, run_data)
 
     # Filter by status
@@ -74,3 +76,32 @@ async def test_list_with_filters(db_session: AsyncSession):
     runs = await repo.list_with_filters(db_session, filters)
     assert len(runs) == 1
     assert runs[0].test_name == "run-1"
+
+
+@pytest.mark.asyncio
+async def test_list_with_filters_by_fingerprint(db_session: AsyncSession):
+    repo = RunRepository()
+    env_repo = EnvironmentRepository()
+
+    # Create a run and give it an environment with a unique fingerprint
+    run_with_env = await repo.create(
+        db_session, RunCreate(test_name="with-env", status="completed")
+    )
+    fingerprint = "unique-fingerprint-123"
+    await env_repo.create_for_run(
+        db_session,
+        run_with_env.run_id,
+        EnvironmentCreate(fingerprint_hash=fingerprint, cluster_name="local"),
+    )
+
+    # Create another run without environment (or different fingerprint)
+    _run_without_env = await repo.create(
+        db_session, RunCreate(test_name="no-env", status="completed")
+    )
+
+    # Filter by fingerprint
+    filters = RunFilter(fingerprint=fingerprint, limit=10, offset=0)
+    runs = await repo.list_with_filters(db_session, filters)
+
+    assert len(runs) == 1
+    assert runs[0].run_id == run_with_env.run_id
