@@ -15,7 +15,7 @@ from .repositories import (
     RunRepository,
     SnapshotRepository,
 )
-from .schemas import (
+from .schemas.run import (
     ArtifactCreate,
     ArtifactResponse,
     EnvironmentCreate,

@@ -1,10 +1,9 @@
 """Run routes."""
 
-from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi_class import View
 from fastapi_injector import Injected
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +13,7 @@ from perfeng.storage.schemas import (
     EnvironmentCreate,
     RunCreate,
     RunCreateResponse,
+    RunFilter,
     RunResponse,
     RunUpdate,
 )
@@ -68,15 +68,7 @@ class RunView:
     async def list_runs(
         self,
         session: Annotated[AsyncSession, Depends(get_session)],
-        status: Annotated[str | None, Query()] = None,
-        test_name: Annotated[str | None, Query()] = None,
-        start_date: Annotated[datetime | None, Query()] = None,
-        end_date: Annotated[datetime | None, Query()] = None,
-        fingerprint: Annotated[str | None, Query()] = None,
-        limit: Annotated[int, Query(ge=1, le=100)] = 50,
-        offset: Annotated[int, Query(ge=0)] = 0,
+        filters: Annotated[RunFilter, Depends()],
     ):
         """List runs with filters."""
-        return await self.service.list_runs(
-            session, status, test_name, start_date, end_date, fingerprint, limit, offset
-        )
+        return await self.service.list_runs(session, filters)

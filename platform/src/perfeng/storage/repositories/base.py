@@ -4,7 +4,7 @@ from typing import Any, Generic, TypeVar
 from uuid import UUID
 
 from pydantic import BaseModel
-from sqlalchemy import inspect, select
+from sqlalchemy import ColumnElement, Select, inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 ModelType = TypeVar("ModelType")
@@ -28,6 +28,13 @@ class BaseRepository(Generic[ModelType, CreateSchemaType]):
         if len(mapper.primary_key) != 1:
             raise ValueError("Repository supports only models with a single primary key column")
         self.pk_column = mapper.primary_key[0]
+
+    @staticmethod
+    def apply_filters(query: Select, *conditions: ColumnElement[bool] | None) -> Select:
+        """Apply only the conditions that were actually built."""
+
+        active = [c for c in conditions if c is not None]
+        return query.where(*active) if active else query
 
     async def create(
         self,

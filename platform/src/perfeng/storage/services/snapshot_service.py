@@ -6,7 +6,7 @@ from injector import inject
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from perfeng.storage.repositories.snapshot_repository import SnapshotRepository
-from perfeng.storage.schemas import SnapshotCreate, SnapshotResponse
+from perfeng.storage.schemas import SnapshotCreate, SnapshotFilter, SnapshotResponse
 
 
 class SnapshotService:
@@ -31,13 +31,11 @@ class SnapshotService:
         self,
         session: AsyncSession,
         run_id: UUID,
-        resource_type: str | None = None,
-        limit: int = 100,
-        offset: int = 0,
+        filters: SnapshotFilter,
     ) -> list[SnapshotResponse]:
         """List snapshots for a run."""
 
         snapshots = await self.snapshot_repo.list_by_run(
-            session, run_id, resource_type, limit, offset
+            session, run_id, filters.resource_type, filters.limit, filters.offset
         )
         return [SnapshotResponse.model_validate(s) for s in snapshots]

@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from perfeng.storage.generated_models import ResourceSnapshots
 from perfeng.storage.repositories.base import BaseRepository
-from perfeng.storage.schemas import SnapshotCreate
+from perfeng.storage.schemas import SnapshotCreate, SnapshotFilter
 
 
 class SnapshotRepository(BaseRepository[ResourceSnapshots, SnapshotCreate]):
@@ -33,15 +33,23 @@ class SnapshotRepository(BaseRepository[ResourceSnapshots, SnapshotCreate]):
         self,
         session: AsyncSession,
         run_id: UUID,
-        resource_type: str | None = None,
-        limit: int = 100,
-        offset: int = 0,
+        filters: SnapshotFilter,
     ) -> list[ResourceSnapshots]:
         """List snapshots for a run with optional filter."""
 
         query = select(ResourceSnapshots).where(ResourceSnapshots.run_id == run_id)
-        if resource_type:
-            query = query.where(ResourceSnapshots.resource_type == resource_type)
-        query = query.order_by(ResourceSnapshots.snapshot_time.asc()).limit(limit).offset(offset)
+
+        query = self.apply_filters(
+            query,
+            ResourceSnapshots.resource_type == filters.resource_type
+            if filters.resource_type
+            else None,
+        )
+
+        query = (
+            query.order_by(ResourceSnapshots.snapshot_time.asc())
+            .limit(filters.limit)
+            .offset(filters.offset)
+        )
         result = await session.execute(query)
         return list(result.scalars().all())

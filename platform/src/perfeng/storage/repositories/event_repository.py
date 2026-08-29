@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from perfeng.storage.generated_models import CorrelationEvents
 from perfeng.storage.repositories.base import BaseRepository
-from perfeng.storage.schemas import EventCreate
+from perfeng.storage.schemas import EventCreate, EventFilter
 
 
 class EventRepository(BaseRepository[CorrelationEvents, EventCreate]):
@@ -33,18 +33,22 @@ class EventRepository(BaseRepository[CorrelationEvents, EventCreate]):
         self,
         session: AsyncSession,
         run_id: UUID,
-        event_type: str | None = None,
-        phase_name: str | None = None,
-        limit: int = 100,
-        offset: int = 0,
+        filters: EventFilter,
     ) -> list[CorrelationEvents]:
         """List events for a run with optional filters."""
 
         query = select(CorrelationEvents).where(CorrelationEvents.run_id == run_id)
-        if event_type:
-            query = query.where(CorrelationEvents.event_type == event_type)
-        if phase_name:
-            query = query.where(CorrelationEvents.phase_name == phase_name)
-        query = query.order_by(CorrelationEvents.event_time.asc()).limit(limit).offset(offset)
+
+        query = self.apply_filters(
+            query,
+            CorrelationEvents.event_type == filters.event_type if filters.event_type else None,
+            CorrelationEvents.phase_name == filters.phase_name if filters.phase_name else None,
+        )
+
+        query = (
+            query.order_by(CorrelationEvents.event_time.asc())
+            .limit(filters.limit)
+            .offset(filters.offset)
+        )
         result = await session.execute(query)
         return list(result.scalars().all())

@@ -1,6 +1,5 @@
 """Run service with business logic."""
 
-from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -16,6 +15,7 @@ from perfeng.storage.schemas import (
     EnvironmentResponse,
     RunCreate,
     RunCreateResponse,
+    RunFilter,
     RunResponse,
     RunUpdate,
 )
@@ -75,17 +75,9 @@ class RunService:
     async def list_runs(
         self,
         session: Annotated[AsyncSession, Depends(get_session)],
-        status: str | None = None,
-        test_name: str | None = None,
-        start_date: datetime | None = None,
-        end_date: datetime | None = None,
-        fingerprint: str | None = None,
-        limit: int = 50,
-        offset: int = 0,
+        filters: RunFilter,
     ) -> list[RunResponse]:
         """List runs with filters, returning Pydantic models."""
 
-        runs = await self.run_repo.list_with_filters(
-            session, status, test_name, start_date, end_date, fingerprint, limit, offset
-        )
+        runs = await self.run_repo.list_with_filters(session, filters)
         return [RunResponse.model_validate(run) for run in runs]

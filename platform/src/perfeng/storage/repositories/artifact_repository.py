@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from perfeng.storage.generated_models import DataArtifacts
 from perfeng.storage.repositories.base import BaseRepository
-from perfeng.storage.schemas import ArtifactCreate
+from perfeng.storage.schemas import ArtifactCreate, ArtifactFilter
 
 
 class ArtifactRepository(BaseRepository[DataArtifacts, ArtifactCreate]):
@@ -33,15 +33,21 @@ class ArtifactRepository(BaseRepository[DataArtifacts, ArtifactCreate]):
         self,
         session: AsyncSession,
         run_id: UUID,
-        data_type: str | None = None,
-        limit: int = 100,
-        offset: int = 0,
+        filters: ArtifactFilter,
     ) -> list[DataArtifacts]:
         """List artifacts for a run with optional filter."""
 
         query = select(DataArtifacts).where(DataArtifacts.run_id == run_id)
-        if data_type:
-            query = query.where(DataArtifacts.data_type == data_type)
-        query = query.order_by(DataArtifacts.created_at.desc()).limit(limit).offset(offset)
+
+        query = self.apply_filters(
+            query,
+            DataArtifacts.data_type == filters.data_type if filters.data_type else None,
+        )
+
+        query = (
+            query.order_by(DataArtifacts.created_at.desc())
+            .limit(filters.limit)
+            .offset(filters.offset)
+        )
         result = await session.execute(query)
         return list(result.scalars().all())

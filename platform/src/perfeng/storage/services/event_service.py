@@ -6,7 +6,7 @@ from injector import inject
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from perfeng.storage.repositories.event_repository import EventRepository
-from perfeng.storage.schemas import EventCreate, EventResponse
+from perfeng.storage.schemas import EventCreate, EventFilter, EventResponse
 
 
 class EventService:
@@ -31,14 +31,9 @@ class EventService:
         self,
         session: AsyncSession,
         run_id: UUID,
-        event_type: str | None = None,
-        phase_name: str | None = None,
-        limit: int = 100,
-        offset: int = 0,
+        filters: EventFilter,
     ) -> list[EventResponse]:
         """List events for a run."""
 
-        events = await self.event_repo.list_by_run(
-            session, run_id, event_type, phase_name, limit, offset
-        )
+        events = await self.event_repo.list_by_run(session, run_id, filters)
         return [EventResponse.model_validate(e) for e in events]

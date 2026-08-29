@@ -1,15 +1,14 @@
 """Run repository with specialized queries."""
 
-from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import and_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from perfeng.storage.generated_models import Environments, TestRuns
 from perfeng.storage.repositories.base import BaseRepository
-from perfeng.storage.schemas import RunCreate, RunUpdate
+from perfeng.storage.schemas import RunCreate, RunFilter, RunUpdate
 
 
 class RunRepository(BaseRepository[TestRuns, RunCreate]):
@@ -50,35 +49,25 @@ class RunRepository(BaseRepository[TestRuns, RunCreate]):
     async def list_with_filters(
         self,
         session: AsyncSession,
-        status: str | None = None,
-        test_name: str | None = None,
-        start_date: datetime | None = None,
-        end_date: datetime | None = None,
-        fingerprint: str | None = None,
-        limit: int = 50,
-        offset: int = 0,
+        filters: RunFilter,
     ) -> list[TestRuns]:
         """List runs with advanced filters."""
 
         query = select(TestRuns)
-        conditions = []
-
-        if status:
-            conditions.append(TestRuns.status == status)
-        if test_name:
-            conditions.append(TestRuns.test_name.ilike(f"%{test_name}%"))
-        if start_date:
-            conditions.append(TestRuns.start_time >= start_date)
-        if end_date:
-            conditions.append(TestRuns.start_time <= end_date)
-
-        if fingerprint:
+        if filters.fingerprint:
             query = query.join(TestRuns.environments)
-            conditions.append(Environments.fingerprint_hash == fingerprint)
 
-        if conditions:
-            query = query.where(and_(*conditions))
+        query = self.apply_filters(
+            query,
+            TestRuns.status == filters.status if filters.status else None,
+            TestRuns.test_name.ilike(f"%{filters.test_name}%") if filters.test_name else None,
+            TestRuns.start_time >= filters.start_date if filters.start_date else None,
+            TestRuns.start_time <= filters.end_date if filters.end_date else None,
+            Environments.fingerprint_hash == filters.fingerprint if filters.fingerprint else None,
+        )
 
-        query = query.order_by(TestRuns.start_time.desc()).limit(limit).offset(offset)
+        query = (
+            query.order_by(TestRuns.start_time.desc()).limit(filters.limit).offset(filters.offset)
+        )
         result = await session.execute(query)
         return list(result.scalars().all())

@@ -3,13 +3,13 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, status
 from fastapi_class import View
 from fastapi_injector import Injected
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from perfeng.storage.database import get_session
-from perfeng.storage.schemas import SnapshotCreate, SnapshotResponse
+from perfeng.storage.schemas import SnapshotCreate, SnapshotFilter, SnapshotResponse
 from perfeng.storage.services.snapshot_service import SnapshotService
 
 router = APIRouter(prefix="/api/v1/runs/{run_id}/snapshots", tags=["snapshots"])
@@ -35,10 +35,8 @@ class RunView:
         self,
         session: Annotated[AsyncSession, Depends(get_session)],
         run_id: UUID,
-        resource_type: Annotated[str | None, Query()] = None,
-        limit: Annotated[int, Query(ge=1, le=1000)] = 100,
-        offset: Annotated[int, Query(ge=0)] = 0,
+        filters: Annotated[SnapshotFilter, Depends()],
     ):
         """List snapshots for a run."""
 
-        return await self.service.list_snapshots(session, run_id, resource_type, limit, offset)
+        return await self.service.list_snapshots(session, run_id, filters)

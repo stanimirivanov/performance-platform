@@ -6,7 +6,7 @@ from injector import inject
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from perfeng.storage.repositories.artifact_repository import ArtifactRepository
-from perfeng.storage.schemas import ArtifactCreate, ArtifactResponse
+from perfeng.storage.schemas import ArtifactCreate, ArtifactFilter, ArtifactResponse
 
 
 class ArtifactService:
@@ -31,10 +31,8 @@ class ArtifactService:
         self,
         session: AsyncSession,
         run_id: UUID,
-        data_type: str | None = None,
-        limit: int = 100,
-        offset: int = 0,
+        filters: ArtifactFilter,
     ) -> list[ArtifactResponse]:
         """List artifacts for a run."""
-        artifacts = await self.artifact_repo.list_by_run(session, run_id, data_type, limit, offset)
+        artifacts = await self.artifact_repo.list_by_run(session, run_id, filters)
         return [ArtifactResponse.model_validate(a) for a in artifacts]
