@@ -5,7 +5,7 @@ from uuid import UUID
 from injector import inject
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from perfeng.storage.repositories.artifact_repository import ArtifactRepository
+from perfeng.storage.repositories import ArtifactRepository
 from perfeng.storage.schemas import ArtifactCreate, ArtifactFilter, ArtifactResponse
 
 

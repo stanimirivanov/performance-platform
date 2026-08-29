@@ -1,7 +1,7 @@
 """Generate SQLAlchemy models from the database schema using sqlacodegen.
 
 This script connects to the configured PostgreSQL database and creates
-`src/perfeng/storage/generated_models.py` containing declarative models
+`src/perfeng/storage/models/generated.py` containing declarative models
 that reflect the `metadata` schema.
 
 Usage:
@@ -18,18 +18,20 @@ import subprocess
 import sys
 from pathlib import Path
 
-# Default database URL – must use a sync driver
-DEFAULT_DATABASE_URL = "postgresql+psycopg2://test_user:test_password@localhost:5432/metadata"
+from perfeng.core.config import settings
 
 # Schema to reflect
 TARGET_SCHEMA = "metadata"
 
 # Where to write the generated file
-OUTPUT_PATH = Path(__file__).parent.parent / "src" / "perfeng" / "storage" / "generated_models.py"
+OUTPUT_PATH = (
+    Path(__file__).parent.parent / "src" / "perfeng" / "storage" / "models" / "generated.py"
+)
 
 
 def main() -> int:
-    db_url = os.environ.get("SQLACODEGEN_DATABASE_URL", DEFAULT_DATABASE_URL)
+    # Prefer explicit env var, then fall back to settings
+    db_url = os.environ.get("SQLACODEGEN_DATABASE_URL", settings.database_sync_url)
 
     # Build sqlacodegen command with schema selection
     cmd = [

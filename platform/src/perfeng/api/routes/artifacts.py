@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from perfeng.storage.database import get_session
 from perfeng.storage.schemas import ArtifactCreate, ArtifactFilter, ArtifactResponse
-from perfeng.storage.services.artifact_service import ArtifactService
+from perfeng.storage.services import ArtifactService
 
 router = APIRouter(prefix="/api/v1/runs/{run_id}/artifacts", tags=["artifacts"])
 

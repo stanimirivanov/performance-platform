@@ -8,8 +8,7 @@ from injector import inject
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from perfeng.storage.database import get_session
-from perfeng.storage.repositories.environment_repository import EnvironmentRepository
-from perfeng.storage.repositories.run_repository import RunRepository
+from perfeng.storage.repositories import EnvironmentRepository, RunRepository
 from perfeng.storage.schemas import (
     EnvironmentCreate,
     EnvironmentResponse,

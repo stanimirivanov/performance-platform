@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from perfeng.storage.database import get_session
 from perfeng.storage.schemas import SnapshotCreate, SnapshotFilter, SnapshotResponse
-from perfeng.storage.services.snapshot_service import SnapshotService
+from perfeng.storage.services import SnapshotService
 
 router = APIRouter(prefix="/api/v1/runs/{run_id}/snapshots", tags=["snapshots"])
 

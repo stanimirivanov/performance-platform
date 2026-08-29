@@ -5,8 +5,8 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from perfeng.storage.generated_models import ResourceSnapshots
-from perfeng.storage.repositories.base import BaseRepository
+from perfeng.storage.models import ResourceSnapshots
+from perfeng.storage.repositories import BaseRepository
 from perfeng.storage.schemas import SnapshotCreate, SnapshotFilter
 
 

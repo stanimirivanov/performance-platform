@@ -17,7 +17,7 @@ from perfeng.storage.schemas import (
     RunResponse,
     RunUpdate,
 )
-from perfeng.storage.services.run_service import RunService
+from perfeng.storage.services import RunService
 
 router = APIRouter(prefix="/api/v1/runs", tags=["runs"])
 

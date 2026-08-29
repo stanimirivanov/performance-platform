@@ -5,7 +5,7 @@ from uuid import UUID
 from injector import inject
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from perfeng.storage.repositories.event_repository import EventRepository
+from perfeng.storage.repositories import EventRepository
 from perfeng.storage.schemas import EventCreate, EventFilter, EventResponse
 
 

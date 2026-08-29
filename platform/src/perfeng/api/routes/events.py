@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from perfeng.storage.database import get_session
 from perfeng.storage.schemas import EventCreate, EventFilter, EventResponse
-from perfeng.storage.services.event_service import EventService
+from perfeng.storage.services import EventService
 
 router = APIRouter(prefix="/api/v1/runs/{run_id}/events", tags=["events"])
 

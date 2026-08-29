@@ -5,7 +5,7 @@ from uuid import UUID
 from injector import inject
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from perfeng.storage.repositories.snapshot_repository import SnapshotRepository
+from perfeng.storage.repositories import SnapshotRepository
 from perfeng.storage.schemas import SnapshotCreate, SnapshotFilter, SnapshotResponse
 
 
