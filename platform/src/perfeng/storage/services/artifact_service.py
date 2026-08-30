@@ -32,5 +32,6 @@ class ArtifactService:
         filters: ArtifactFilter,
     ) -> list[ArtifactResponse]:
         """List artifacts for a run."""
+
         artifacts = await self.artifact_repo.list_by_run(session, run_id, filters)
         return [ArtifactResponse.model_validate(a) for a in artifacts]

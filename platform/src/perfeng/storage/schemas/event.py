@@ -22,7 +22,8 @@ class EventCreate(BaseModel):
 class EventResponse(BaseModel):
     """Response model for a correlation event."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
     event_id: UUID
     run_id: UUID
     event_type: str
@@ -30,7 +31,7 @@ class EventResponse(BaseModel):
     event_time: datetime
     description: str | None = None
     tags: list[str] | None = None
-    metadata: dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = Field(default=None, validation_alias="metadata_")
     sequence_number: int | None = None
     parent_event_id: UUID | None = None
 

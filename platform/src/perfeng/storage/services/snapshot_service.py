@@ -33,7 +33,5 @@ class SnapshotService:
     ) -> list[SnapshotResponse]:
         """List snapshots for a run."""
 
-        snapshots = await self.snapshot_repo.list_by_run(
-            session, run_id, filters.resource_type, filters.limit, filters.offset
-        )
+        snapshots = await self.snapshot_repo.list_by_run(session, run_id, filters)
         return [SnapshotResponse.model_validate(s) for s in snapshots]

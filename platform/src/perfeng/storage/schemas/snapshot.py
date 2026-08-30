@@ -28,7 +28,8 @@ class SnapshotCreate(BaseModel):
 class SnapshotResponse(BaseModel):
     """Response model for a snapshot."""
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
     snapshot_id: UUID
     run_id: UUID
     resource_type: str
@@ -44,7 +45,7 @@ class SnapshotResponse(BaseModel):
     snapshot_time: datetime
     test_phase: str | None = None
     time_elapsed_seconds: int | None = None
-    metadata: dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = Field(default=None, validation_alias="metadata_")
 
 
 class SnapshotFilter(BaseModel):
