@@ -1,0 +1,36 @@
+"""Correlation event routes."""
+
+from typing import Annotated
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from perfeng.api.dependencies import get_event_service
+from perfeng.storage.database import get_session
+from perfeng.storage.schemas import EventCreate, EventFilter, EventResponse
+from perfeng.storage.services import EventService
+
+router = APIRouter(prefix="/api/v1/runs/{run_id}/events", tags=["events"])
+
+
+@router.post("/", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
+async def create_event(
+    run_id: UUID,
+    event_data: EventCreate,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    service: Annotated[EventService, Depends(get_event_service)],
+):
+    """Add a correlation event for a run."""
+    return await service.create_event(session, run_id, event_data)
+
+
+@router.get("/", response_model=list[EventResponse])
+async def list_events(
+    run_id: UUID,
+    filters: Annotated[EventFilter, Depends()],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    service: Annotated[EventService, Depends(get_event_service)],
+):
+    """List events for a run."""
+    return await service.list_events(session, run_id, filters)

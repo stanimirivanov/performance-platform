@@ -91,3 +91,4 @@ htmlcov/
 
 # Pytohon generated
 /platform/src/perfeng/generated/
+/platform/src/perfeng/storage/generated_models.py

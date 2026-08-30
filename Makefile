@@ -17,8 +17,8 @@ install: ## Install all dependencies
 	cd platform && uv sync
 	pnpm install
 
-generate-models: ## Generate Pydantic models from JSON schemas
-	cd platform && uv run python scripts/generate_models.py
+generate-models: ## Generate Pydantic models from JSON schemas and SQL migrations
+	cd platform && uv run python scripts/generate_models.py && uv run python scripts/generate_sqlalchemy_models.py
 
 test: ## Run all tests
 	cd platform && uv run pytest

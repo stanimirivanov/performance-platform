@@ -1,0 +1,37 @@
+"""Artifact service."""
+
+from uuid import UUID
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from perfeng.storage.repositories import ArtifactRepository
+from perfeng.storage.schemas import ArtifactCreate, ArtifactFilter, ArtifactResponse
+
+
+class ArtifactService:
+    """Service for data artifact operations."""
+
+    def __init__(self, artifact_repo: ArtifactRepository):
+        self.artifact_repo = artifact_repo
+
+    async def create_artifact(
+        self,
+        session: AsyncSession,
+        run_id: UUID,
+        artifact_data: ArtifactCreate,
+    ) -> ArtifactResponse:
+        """Create a new artifact for a run."""
+
+        artifact = await self.artifact_repo.create_for_run(session, run_id, artifact_data)
+        return ArtifactResponse.model_validate(artifact)
+
+    async def list_artifacts(
+        self,
+        session: AsyncSession,
+        run_id: UUID,
+        filters: ArtifactFilter,
+    ) -> list[ArtifactResponse]:
+        """List artifacts for a run."""
+
+        artifacts = await self.artifact_repo.list_by_run(session, run_id, filters)
+        return [ArtifactResponse.model_validate(a) for a in artifacts]
