@@ -2,7 +2,6 @@
 
 from uuid import UUID
 
-from injector import inject
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from perfeng.storage.repositories import SnapshotRepository
@@ -12,7 +11,6 @@ from perfeng.storage.schemas import SnapshotCreate, SnapshotFilter, SnapshotResp
 class SnapshotService:
     """Service for resource snapshot operations."""
 
-    @inject
     def __init__(self, snapshot_repo: SnapshotRepository):
         self.snapshot_repo = snapshot_repo
 

@@ -2,17 +2,18 @@
 
 from unittest.mock import AsyncMock
 
+import httpx
 import pytest
-from fastapi.testclient import TestClient
+import pytest_asyncio
+from httpx import ASGITransport
+
+from perfeng.api.app import create_app
+from perfeng.api.dependencies import get_run_service
+from perfeng.storage.services.run_service import RunService
 
 
-@pytest.fixture
-def client_with_fake_service():
-    from perfeng.api.dependencies import get_run_service
-
-    from perfeng.api.app import create_app
-    from perfeng.storage.services.run_service import RunService
-
+@pytest_asyncio.fixture
+async def client_with_fake_service():
     app = create_app()
 
     fake_service = AsyncMock(spec=RunService)
@@ -25,12 +26,14 @@ def client_with_fake_service():
 
     app.dependency_overrides[get_run_service] = override_get_run_service
 
-    with TestClient(app) as client:
+    transport = ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         yield client, fake_service
 
 
-def test_create_run_with_fake_service(client_with_fake_service):
+@pytest.mark.asyncio
+async def test_create_run_with_fake_service(client_with_fake_service):
     client, fake_service = client_with_fake_service
-    response = client.post("/api/v1/runs/", json={"test_name": "fake"})
+    response = await client.post("/api/v1/runs/", json={"test_name": "fake"})
     assert response.status_code == 201
     fake_service.create_run.assert_awaited_once()

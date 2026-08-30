@@ -8,7 +8,7 @@ Usage:
     uv run python scripts/generate_sqlalchemy_models.py
 
 The database URL can be overridden with the `SQLACODEGEN_DATABASE_URL` environment variable.
-Use a synchronous PostgreSQL driver (e.g., `postgresql+psycopg2://`).
+If not set, the `database_sync_url` from the application settings is used.
 """
 
 from __future__ import annotations
@@ -27,6 +27,29 @@ TARGET_SCHEMA = "metadata"
 OUTPUT_PATH = (
     Path(__file__).parent.parent / "src" / "perfeng" / "storage" / "models" / "generated.py"
 )
+
+
+def post_process_generated_models(output_path: Path) -> None:
+    """Insert `__test__ = False` into any class whose name starts with 'Test'.
+
+    This prevents pytest from attempting to collect SQLAlchemy model classes
+    (e.g., TestRuns) as test classes.
+    """
+    content = output_path.read_text(encoding="utf-8")
+    lines = content.splitlines()
+    new_lines = []
+
+    for line in lines:
+        new_lines.append(line)
+        # Detect class definition lines that start with 'class Test'
+        stripped = line.lstrip()
+        if stripped.startswith("class Test") and stripped.endswith(":"):
+            # Determine indentation of the class line
+            indent = line[: len(line) - len(stripped)]
+            # Add the __test__ attribute inside the class body (4 spaces deeper)
+            new_lines.append(f"{indent}    __test__ = False")
+
+    output_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
 
 
 def main() -> int:
@@ -56,6 +79,9 @@ def main() -> int:
     except subprocess.CalledProcessError as exc:
         print(f"Error generating models: {exc}", file=sys.stderr)
         return exc.returncode
+
+    # Post-process the generated file to add __test__ = False
+    post_process_generated_models(OUTPUT_PATH)
 
     print("Model generation complete.")
     return 0

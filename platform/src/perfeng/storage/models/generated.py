@@ -27,6 +27,7 @@ class ResourceType(str, enum.Enum):
 
 
 class TestPhase(str, enum.Enum):
+    __test__ = False
     SETUP = 'setup'
     WARMUP = 'warmup'
     RAMP_UP = 'ramp_up'
@@ -36,6 +37,7 @@ class TestPhase(str, enum.Enum):
 
 
 class TestStatus(str, enum.Enum):
+    __test__ = False
     PENDING = 'pending'
     RUNNING = 'running'
     COMPLETED = 'completed'
@@ -58,6 +60,7 @@ class Migrations(Base):
 
 
 class TestRuns(Base):
+    __test__ = False
     __tablename__ = 'test_runs'
     __table_args__ = (
         CheckConstraint('duration_seconds >= 0', name='test_runs_duration_seconds_check'),

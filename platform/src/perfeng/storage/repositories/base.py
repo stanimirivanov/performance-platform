@@ -28,6 +28,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType]):
         if len(mapper.primary_key) != 1:
             raise ValueError("Repository supports only models with a single primary key column")
         self.pk_column = mapper.primary_key[0]
+        self.column_names = set(mapper.columns.keys())  # <-- store valid column names
 
     @staticmethod
     def apply_filters(query: Select, *conditions: ColumnElement[bool] | None) -> Select:
@@ -36,13 +37,14 @@ class BaseRepository(Generic[ModelType, CreateSchemaType]):
         active = [c for c in conditions if c is not None]
         return query.where(*active) if active else query
 
-    async def create(
-        self,
-        session: AsyncSession,
-        create_data: CreateSchemaType,
-    ) -> ModelType:
-        """Create a new record."""
-        instance = self.model(**create_data.model_dump())
+    async def create(self, session: AsyncSession, create_data: CreateSchemaType) -> ModelType:
+        """Create a new record, ignoring fields not mapped to columns."""
+        data = {
+            key: value
+            for key, value in create_data.model_dump().items()
+            if key in self.column_names
+        }
+        instance = self.model(**data)
         session.add(instance)
         await session.flush()
         return instance

@@ -1,7 +1,1 @@
-"""App module IoC."""
-
-from .ioc import AppModule
-
-__all__ = [
-    "AppModule",
-]
+"""Performance Engineering Platform package."""

@@ -2,7 +2,6 @@ import os
 from collections.abc import AsyncGenerator
 
 import asyncpg
-import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -53,34 +52,11 @@ async def test_engine() -> AsyncGenerator[AsyncEngine, None]:
 
 
 @pytest_asyncio.fixture
-async def db_session(test_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, None]:
+async def db_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
     """Provide an AsyncSession that rolls back after each test."""
     async_session_factory = async_sessionmaker(
         test_engine, expire_on_commit=False, class_=AsyncSession
     )
-    async with async_session_factory() as session, session.begin():
+    async with async_session_factory() as session:
         yield session
         await session.rollback()
-
-
-# ---------------------------------------------------------------------------
-# FastAPI test client
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def client(db_session):
-    """Create a FastAPI TestClient with overridden database session."""
-    from fastapi.testclient import TestClient
-
-    from perfeng.api.app import create_app
-    from perfeng.storage.database import get_session
-
-    app = create_app()
-
-    async def override_get_session():
-        yield db_session
-
-    app.dependency_overrides[get_session] = override_get_session
-    with TestClient(app) as test_client:
-        yield test_client

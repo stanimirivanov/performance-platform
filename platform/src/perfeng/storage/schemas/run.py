@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from perfeng.storage.schemas.environment import EnvironmentResponse
+from perfeng.storage.schemas.environment import EnvironmentCreate, EnvironmentResponse
 
 
 class RunCreate(BaseModel):
@@ -25,6 +25,7 @@ class RunCreate(BaseModel):
     ci_job_id: str | None = None
     policy_version: str | None = None
     notes: str | None = None
+    environment: EnvironmentCreate | None = None
 
 
 class RunUpdate(BaseModel):

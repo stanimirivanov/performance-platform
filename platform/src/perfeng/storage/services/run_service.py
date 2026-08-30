@@ -4,13 +4,11 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends
-from injector import inject
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from perfeng.storage.database import get_session
 from perfeng.storage.repositories import EnvironmentRepository, RunRepository
 from perfeng.storage.schemas import (
-    EnvironmentCreate,
     EnvironmentResponse,
     RunCreate,
     RunCreateResponse,
@@ -23,7 +21,6 @@ from perfeng.storage.schemas import (
 class RunService:
     """Service for run operations."""
 
-    @inject
     def __init__(self, run_repo: RunRepository, env_repo: EnvironmentRepository):
         self.run_repo = run_repo
         self.env_repo = env_repo
@@ -32,14 +29,13 @@ class RunService:
         self,
         session: AsyncSession,
         run_data: RunCreate,
-        environment_data: EnvironmentCreate | None = None,
     ) -> RunCreateResponse:
-        """Create a new run with optional environment."""
+        """Create a new run with optional embedded environment."""
 
         run = await self.run_repo.create(session, run_data)
         response = RunCreateResponse(run_id=run.run_id)
-        if environment_data:
-            env = await self.env_repo.create_for_run(session, run.run_id, environment_data)
+        if run_data.environment:
+            env = await self.env_repo.create_for_run(session, run.run_id, run_data.environment)
             response.environment_id = env.environment_id
         return response
 

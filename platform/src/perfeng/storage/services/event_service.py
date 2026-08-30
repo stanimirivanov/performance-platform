@@ -2,7 +2,6 @@
 
 from uuid import UUID
 
-from injector import inject
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from perfeng.storage.repositories import EventRepository
@@ -12,7 +11,6 @@ from perfeng.storage.schemas import EventCreate, EventFilter, EventResponse
 class EventService:
     """Service for correlation event operations."""
 
-    @inject
     def __init__(self, event_repo: EventRepository):
         self.event_repo = event_repo
 
