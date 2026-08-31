@@ -4,6 +4,7 @@ Tests for detectors: parsers, local node detector, kubernetes detector, kubectl 
 
 from unittest.mock import Mock, patch
 
+import psutil
 import pytest
 
 from perfeng.generated.environment import CpuArchitecture
@@ -59,11 +60,17 @@ class TestLocalNodeDetector:
         assert node.resources.memory_total_gb == 16.0
         assert node.resources.disk_total_gb == 100.0
 
-    def test_detect_psutil_failure(self):
-        detector = LocalNodeDetector()
-        with patch("perfeng.metadata.detectors.local.psutil.cpu_count", side_effect=Exception):
-            node = detector.detect()
-            assert node.resources.cpu_cores >= 1  # fallback to os.cpu_count
+        def test_detect_psutil_failure(self):
+            detector = LocalNodeDetector()
+            with (
+                patch(
+                    "perfeng.metadata.detectors.local.psutil.cpu_count",
+                    side_effect=psutil.Error,
+                ),
+                patch("perfeng.metadata.detectors.local.os.cpu_count", return_value=4),
+            ):
+                node = detector.detect()
+                assert node.resources.cpu_cores == 4  # fallback to os.cpu_count
 
 
 class TestKubectlClient:

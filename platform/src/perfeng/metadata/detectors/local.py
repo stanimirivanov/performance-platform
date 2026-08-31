@@ -29,6 +29,12 @@ class LocalNodeDetector:
                 memory_total_gb=psutil.virtual_memory().total / (1024**3),
                 disk_total_gb=psutil.disk_usage("/").total / (1024**3),
             )
-        except Exception:
-            # psutil may fail in restricted environments (e.g. containers)
-            return NodeResources(cpu_cores=os.cpu_count() or 1)
+        except (OSError, ImportError, psutil.Error):
+            # psutil may fail in restricted environments (e.g., missing /proc,
+            # permission denied, or unsupported platform).
+            # Fallback to minimal CPU count only.
+            try:
+                cpu_cores = os.cpu_count() or 1
+            except OSError:
+                cpu_cores = 1
+            return NodeResources(cpu_cores=cpu_cores)
