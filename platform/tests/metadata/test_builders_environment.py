@@ -8,7 +8,11 @@ import pytest
 
 from perfeng.generated.environment import EnvironmentSpecification
 from perfeng.metadata.builders import EnvironmentBuilder
-from perfeng.metadata.config import CollectorConfig
+from perfeng.metadata.builders.environment import (
+    EnvironmentBuildConfig,
+    KubernetesBuildConfig,
+    RuntimeBuildConfig,
+)
 from perfeng.metadata.detectors import (
     ClusterInfo,
     ClusterType,
@@ -42,9 +46,8 @@ def fake_fingerprint_generator():
 
 
 def make_config(auto_detect=True, **kwargs):
-    return CollectorConfig(
+    return EnvironmentBuildConfig(
         auto_detect=auto_detect,
-        timeout_seconds=30,
         fingerprint_excludes=(),
         **kwargs,
     )
@@ -102,15 +105,9 @@ class TestEnvironmentBuilder:
     def test_build_uses_config_overrides(self, sample_node_info, fake_fingerprint_generator):
         config = make_config(
             auto_detect=False,
-            cluster=type("ClusterConfig", (), {"name": "override-cluster", "type": None})(),
-            kubernetes=type(
-                "KubernetesConfig", (), {"version": "v1.27.0", "node_count": 5, "node_pools": None}
-            )(),
-            runtime=type(
-                "RuntimeConfig",
-                (),
-                {"container_runtime": "docker", "cni": None, "storage_class": None, "kernel": None},
-            )(),
+            cluster_name="override-cluster",
+            kubernetes=KubernetesBuildConfig(version="v1.27.0", node_count=5),
+            runtime=RuntimeBuildConfig(container_runtime="docker"),
         )
         node_detector = Mock(spec=LocalNodeDetector)
         node_detector.detect.return_value = sample_node_info

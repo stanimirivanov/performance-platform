@@ -2,10 +2,50 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+from typing import Any
+
 from perfeng.generated.environment import Application, EnvironmentSpecification, Kubernetes, Runtime
 from perfeng.metadata.builders.fingerprint import DefaultFingerprintGenerator, FingerprintGenerator
-from perfeng.metadata.config import CollectorConfig
 from perfeng.metadata.detectors import KubernetesClusterDetector, LocalNodeDetector
+
+
+@dataclass(frozen=True, slots=True)
+class KubernetesBuildConfig:
+    """Narrow Kubernetes configuration for the builder."""
+
+    version: str | None = None
+    node_count: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeBuildConfig:
+    """Narrow runtime configuration for the builder."""
+
+    container_runtime: str | None = None
+    cni: str | None = None
+    storage_class: str | None = None
+    kernel: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ApplicationBuildConfig:
+    """Narrow application configuration for the builder."""
+
+    configuration_hash: str | None = None
+    feature_flags: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class EnvironmentBuildConfig:
+    """Configuration required by EnvironmentBuilder (narrow interface)."""
+
+    auto_detect: bool = True
+    cluster_name: str | None = None
+    kubernetes: KubernetesBuildConfig | None = None
+    runtime: RuntimeBuildConfig | None = None
+    application: ApplicationBuildConfig | None = None
+    fingerprint_excludes: tuple[str, ...] = ()
 
 
 class EnvironmentBuilder:
@@ -13,7 +53,7 @@ class EnvironmentBuilder:
 
     def __init__(
         self,
-        config: CollectorConfig,
+        config: EnvironmentBuildConfig,
         *,
         cluster_detector: KubernetesClusterDetector | None = None,
         node_detector: LocalNodeDetector | None = None,
@@ -25,7 +65,6 @@ class EnvironmentBuilder:
         self._fingerprint_generator = fingerprint_generator or DefaultFingerprintGenerator()
 
     def build(self) -> EnvironmentSpecification:
-        """Assemble the full environment spec."""
         detected_cluster = self._detect_cluster()
         detected_node = self._node_detector.detect()
 
@@ -34,7 +73,6 @@ class EnvironmentBuilder:
         runtime = self._build_runtime(detected_cluster, detected_node)
         application = self._build_application()
 
-        # Kubernetes may be None; extract version safely
         k8s_version = kubernetes.version if kubernetes else None
 
         fingerprint = self._fingerprint_generator.generate(
@@ -60,11 +98,7 @@ class EnvironmentBuilder:
         return None
 
     def _resolve_cluster_name(self, detected) -> str:
-        return (
-            (self._config.cluster.name if self._config.cluster else None)
-            or (detected.name if detected else None)
-            or "local"
-        )
+        return self._config.cluster_name or (detected.name if detected else None) or "local"
 
     def _build_kubernetes(self, detected_cluster) -> Kubernetes | None:
         cfg = self._config.kubernetes

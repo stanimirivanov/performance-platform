@@ -10,7 +10,13 @@ from perfeng.metadata.builders.config import (
     RunMetadataBuildConfig,
     RunRuntimeConfig,
 )
-from perfeng.metadata.builders.environment import EnvironmentBuilder
+from perfeng.metadata.builders.environment import (
+    ApplicationBuildConfig,
+    EnvironmentBuildConfig,
+    EnvironmentBuilder,
+    KubernetesBuildConfig,
+    RuntimeBuildConfig,
+)
 from perfeng.metadata.builders.fingerprint import DefaultFingerprintGenerator, FingerprintGenerator
 from perfeng.metadata.builders.mappers import (
     PROFILE_MAPPER,
@@ -27,6 +33,10 @@ __all__ = [
     "DataConfig",
     "DefaultFingerprintGenerator",
     "EnvironmentBuilder",
+    "EnvironmentBuildConfig",
+    "KubernetesBuildConfig",
+    "RuntimeBuildConfig",
+    "ApplicationBuildConfig",
     "EnvironmentConverter",
     "EnvironmentOverrideConfig",
     "EnumMapper",

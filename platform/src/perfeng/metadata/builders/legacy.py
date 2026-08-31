@@ -16,15 +16,14 @@ from perfeng.metadata.builders.config import (
     RunMetadataBuildConfig,
     RunRuntimeConfig,
 )
-from perfeng.metadata.builders.environment import EnvironmentBuilder
-from perfeng.metadata.builders.run_metadata import RunMetadataBuilder
-from perfeng.metadata.config import (
-    ApplicationConfig,
-    ClusterConfig,
-    CollectorConfig,
-    KubernetesConfig,
-    RuntimeConfig,
+from perfeng.metadata.builders.environment import (
+    ApplicationBuildConfig,
+    EnvironmentBuildConfig,
+    EnvironmentBuilder,
+    KubernetesBuildConfig,
+    RuntimeBuildConfig,
 )
+from perfeng.metadata.builders.run_metadata import RunMetadataBuilder
 
 
 def build_environment_spec(
@@ -37,22 +36,16 @@ def build_environment_spec(
     rt_raw = env_raw.get("runtime", {})
     app_raw = env_raw.get("application", {})
 
-    collector_config = CollectorConfig(
+    build_config = EnvironmentBuildConfig(
         auto_detect=auto_detect,
-        timeout_seconds=config.get("timeout_seconds", 30),
-        fingerprint_excludes=tuple(config.get("fingerprint_excludes", [])),
-        cluster=ClusterConfig(
-            name=env_raw.get("cluster"),
-            type=None,
-        ),
-        kubernetes=KubernetesConfig(
-            node_count=k8s_raw.get("nodeCount"),
+        cluster_name=env_raw.get("cluster"),
+        kubernetes=KubernetesBuildConfig(
             version=k8s_raw.get("version"),
-            node_pools=tuple(k8s_raw.get("nodePools", [])) if k8s_raw.get("nodePools") else None,
+            node_count=k8s_raw.get("nodeCount"),
         )
         if k8s_raw
         else None,
-        runtime=RuntimeConfig(
+        runtime=RuntimeBuildConfig(
             container_runtime=rt_raw.get("containerRuntime"),
             cni=rt_raw.get("cni"),
             storage_class=rt_raw.get("storageClass"),
@@ -60,14 +53,16 @@ def build_environment_spec(
         )
         if rt_raw
         else None,
-        application=ApplicationConfig(
+        application=ApplicationBuildConfig(
             configuration_hash=app_raw.get("configurationHash"),
             feature_flags=app_raw.get("featureFlags", {}),
         )
         if app_raw
         else None,
+        fingerprint_excludes=tuple(config.get("fingerprint_excludes", [])),
     )
-    return EnvironmentBuilder(collector_config).build()
+
+    return EnvironmentBuilder(build_config).build()
 
 
 def build_performance_run_metadata(

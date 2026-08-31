@@ -18,6 +18,13 @@ from perfeng.metadata.builders.config import (
     RunConfig,
     RunRuntimeConfig,
 )
+from perfeng.metadata.builders.environment import (
+    ApplicationBuildConfig,
+    EnvironmentBuildConfig,
+    EnvironmentBuilder,
+    KubernetesBuildConfig,
+    RuntimeBuildConfig,
+)
 from perfeng.metadata.config import (
     ClusterConfig,
     CollectorConfig,
@@ -193,6 +200,38 @@ class MetadataCollector:
             application=self._config.application,
         )
 
+    @staticmethod
+    def _to_env_build_config(config: CollectorConfig) -> EnvironmentBuildConfig:
+        """Adapt broad CollectorConfig to narrow EnvironmentBuildConfig."""
+        k8s = config.kubernetes
+        runtime = config.runtime
+        application = config.application
+        return EnvironmentBuildConfig(
+            auto_detect=config.auto_detect,
+            cluster_name=config.cluster.name if config.cluster else None,
+            kubernetes=KubernetesBuildConfig(
+                version=k8s.version if k8s else None,
+                node_count=k8s.node_count if k8s else None,
+            )
+            if k8s
+            else None,
+            runtime=RuntimeBuildConfig(
+                container_runtime=runtime.container_runtime if runtime else None,
+                cni=runtime.cni if runtime else None,
+                storage_class=runtime.storage_class if runtime else None,
+                kernel=runtime.kernel if runtime else None,
+            )
+            if runtime
+            else None,
+            application=ApplicationBuildConfig(
+                configuration_hash=application.configuration_hash if application else None,
+                feature_flags=application.feature_flags if application else {},
+            )
+            if application
+            else None,
+            fingerprint_excludes=config.fingerprint_excludes,
+        )
+
     def collect_environment(
         self,
         overrides: MetadataOverrides | None = None,
@@ -202,10 +241,10 @@ class MetadataCollector:
             return self._environment_cache
 
         effective_config = self._apply_environment_overrides(overrides)
+        env_build_config = self._to_env_build_config(effective_config)
 
-        # Create a new EnvironmentBuilder with the effective config.
         builder = EnvironmentBuilder(
-            config=effective_config,
+            config=env_build_config,
             cluster_detector=self._k8s_detector,
             node_detector=self._local_detector,
         )
