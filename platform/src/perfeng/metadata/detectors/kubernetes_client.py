@@ -18,7 +18,7 @@ class KubectlClient:
 
     def __init__(self, timeout: int = 10) -> None:
         self._timeout = timeout
-        self._cache: dict[str, Any] = {}
+        self._cache: dict[tuple[str, ...], Any] = {}  # tuple key for safety
 
     def run(self, *args: str) -> str:
         """Execute a kubectl command and return stdout.
@@ -44,14 +44,13 @@ class KubectlClient:
 
     def _fetch_json(self, *args: str) -> dict[str, Any]:
         """Run a kubectl command and parse JSON output with caching."""
-        cache_key = ":".join(args)
-        if cache_key not in self._cache:
+        if args not in self._cache:
             output = self.run(*args)
             try:
-                self._cache[cache_key] = json.loads(output)
+                self._cache[args] = json.loads(output)
             except json.JSONDecodeError as exc:
                 raise KubectlError(f"Invalid JSON from kubectl: {exc}") from exc
-        return self._cache[cache_key]
+        return self._cache[args]
 
     def get_nodes(self) -> dict[str, Any]:
         return self._fetch_json("get", "nodes", "-o", "json")
