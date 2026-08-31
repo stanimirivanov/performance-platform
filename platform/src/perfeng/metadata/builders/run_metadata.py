@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import fields
 from datetime import UTC, datetime
 
 from perfeng.generated.environment import EnvironmentSpecification
@@ -126,7 +127,9 @@ class RunMetadataBuilder:
 
     @staticmethod
     def _has_any_field(dataclass_instance) -> bool:
-        return any(v is not None for v in dataclass_instance.__dict__.values())
+        return any(
+            getattr(dataclass_instance, f.name) is not None for f in fields(dataclass_instance)
+        )
 
 
 class EnvironmentConverter:
