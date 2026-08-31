@@ -37,39 +37,58 @@ class ResourceUsageSampler:
     async def stop(self) -> None:
         """Signal the sampler to stop and wait for the loop to finish."""
         self._stop_event.set()
-        # Give the loop a chance to exit
         with contextlib.suppress(asyncio.CancelledError):
             await asyncio.sleep(0)
 
     async def _run_loop(self) -> None:
         """Continuously collect and send snapshots until stopped."""
         while not self._stop_event.is_set():
-            snapshot = self._collect_snapshot()
-            try:
-                await self._post_snapshot(snapshot)
-            except httpx.HTTPError as exc:
-                logger.error("Failed to post snapshot: %s", exc)
+            snapshots = self._collect_snapshots()
+            for snapshot in snapshots:
+                try:
+                    await self._post_snapshot(snapshot)
+                except httpx.HTTPError as exc:
+                    logger.error("Failed to post snapshot: %s", exc)
             await asyncio.sleep(self.interval)
 
-    def _collect_snapshot(self) -> dict[str, Any]:
-        """Collect CPU, memory, disk, and network metrics."""
+    def _collect_snapshots(self) -> list[dict[str, Any]]:
+        """Collect CPU, memory, disk, and network metrics as separate snapshots."""
         cpu_percent = psutil.cpu_percent(interval=None)
         mem = psutil.virtual_memory()
         disk = psutil.disk_usage("/")
         net = psutil.net_io_counters()
 
-        return {
-            "resource_type": "system",
-            "value_current": cpu_percent,
-            "unit": "percent",
-            "test_phase": "steady",
-            "metadata": {
-                "memory_percent": mem.percent,
-                "disk_percent": disk.percent,
-                "bytes_sent": net.bytes_sent,
-                "bytes_recv": net.bytes_recv,
+        snapshots = [
+            {
+                "resource_type": "cpu",
+                "value_current": cpu_percent,
+                "unit": "percent",
+                "test_phase": "steady",
+                "attributes": {},
             },
-        }
+            {
+                "resource_type": "memory",
+                "value_current": mem.percent,
+                "unit": "percent",
+                "test_phase": "steady",
+                "attributes": {},
+            },
+            {
+                "resource_type": "disk",
+                "value_current": disk.percent,
+                "unit": "percent",
+                "test_phase": "steady",
+                "attributes": {},
+            },
+            {
+                "resource_type": "network",
+                "value_current": net.bytes_sent,
+                "unit": "bytes",
+                "test_phase": "steady",
+                "attributes": {"bytes_recv": net.bytes_recv},
+            },
+        ]
+        return snapshots
 
     async def _post_snapshot(self, snapshot: dict[str, Any]) -> None:
         """Send the snapshot to the API."""

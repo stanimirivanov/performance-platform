@@ -30,6 +30,7 @@ def make_fake_snapshot(**kwargs):
         "resource_type": "cpu",
         "value_current": 1.0,
         "snapshot_time": datetime.now(UTC),
+        "attributes": {},
     }
     defaults.update(kwargs)
     return ResourceSnapshots(**defaults)

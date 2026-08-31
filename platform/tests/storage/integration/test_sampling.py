@@ -33,18 +33,26 @@ async def sampler_with_mock_client():
 
 
 @pytest.mark.asyncio
-async def test_collect_snapshot_returns_metrics():
+async def test_collect_snapshots_returns_metrics():
     sampler = ResourceUsageSampler(
         run_id="dummy",
         base_url="http://test",
         interval_seconds=0.01,
         client=AsyncMock(),
     )
-    snapshot = sampler._collect_snapshot()
-    assert snapshot["resource_type"] == "system"
-    assert "value_current" in snapshot
-    assert "metadata" in snapshot
-    assert "memory_percent" in snapshot["metadata"]
+    snapshots = sampler._collect_snapshots()
+    assert isinstance(snapshots, list)
+    assert len(snapshots) == 4  # cpu, memory, disk, network
+
+    resource_types = {s["resource_type"] for s in snapshots}
+    assert resource_types == {"cpu", "memory", "disk", "network"}
+
+    for snap in snapshots:
+        assert "value_current" in snap
+        assert "unit" in snap
+        assert "test_phase" in snap
+        assert "attributes" in snap  # renamed from metadata
+        assert isinstance(snap["attributes"], dict)
 
 
 @pytest.mark.asyncio
@@ -59,7 +67,7 @@ async def test_start_and_stop_posts_snapshots(sampler_with_mock_client):
     assert mock_client.post.await_count >= 1
     call_args = mock_client.post.call_args_list[0]
     assert call_args[0][0] == f"http://test/api/v1/runs/{sampler.run_id}/snapshots/"
-    assert call_args[1]["json"]["resource_type"] == "system"
+    assert call_args[1]["json"]["resource_type"] == "cpu"
 
 
 @pytest.mark.asyncio

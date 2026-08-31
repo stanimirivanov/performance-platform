@@ -28,6 +28,7 @@ def make_fake_event(**kwargs):
         "run_id": uuid4(),
         "event_type": "phase_start",
         "event_time": __import__("datetime").datetime.now(),
+        "attributes": {},
     }
     defaults.update(kwargs)
     return CorrelationEvents(**defaults)
