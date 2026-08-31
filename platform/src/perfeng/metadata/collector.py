@@ -1,29 +1,77 @@
-"""Metadata collector orchestrator."""
+"""Metadata collector orchestrator using typed detectors and builders."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 
 from perfeng.generated.environment import EnvironmentSpecification
 from perfeng.generated.run_metadata import PerformanceRunMetadata
-from perfeng.metadata.builders import EnvironmentBuilder, RunMetadataBuilder, TestMetadata
-from perfeng.metadata.config import CollectorConfig, load_collector_config
-from perfeng.metadata.detectors import (
-    ClusterInfo,
-    KubernetesClusterDetector,
-    LocalNodeDetector,
-    NodeInfo,
+from perfeng.metadata.builders import EnvironmentBuilder, RunMetadataBuildConfig, RunMetadataBuilder
+from perfeng.metadata.builders.config import (
+    CandidateConfig,
+    DataConfig,
+    EnvironmentOverrideConfig,
+    PhasesConfig,
+    RunConfig,
+    RunRuntimeConfig,
+    TestConfig,
 )
+from perfeng.metadata.config import CollectorConfig, load_collector_config
+from perfeng.metadata.detectors import KubernetesClusterDetector, LocalNodeDetector
+
+
+@dataclass(frozen=True, slots=True)
+class TestMetadata:
+    """Convenience structure for test parameters (backward compatible)."""
+
+    test_profile: str = "regression"
+    trigger_type: str = "manual"
+    tool: str = "k6"
+    test_type: str = "api"
+    tool_version: str | None = None
+    scenario: str | None = None
+    git_sha: str = "0" * 40
+    version: str | None = None
+    branch: str | None = None
+    configuration_hash: str | None = None
+    feature_flags: dict[str, Any] = field(default_factory=dict)
+    database_migration_version: str | None = None
+
+    # Runtime resources
+    replicas: int | None = None
+    cpu_requests: str | None = None
+    cpu_limits: str | None = None
+    memory_requests: str | None = None
+    memory_limits: str | None = None
+    hpa: Any | None = None
+
+    # Data
+    dataset_id: str | None = None
+    dataset_version: str | None = None
+    database_size: str | None = None
+    seed_version: str | None = None
+
+    # Phases
+    provision_start: datetime | None = None
+    warmup_start: datetime | None = None
+    measurement_start: datetime | None = None
+    measurement_end: datetime | None = None
+    cooldown_end: datetime | None = None
+
+    # Additional
+    policy_version: str | None = None
+    notes: str | None = None
+    node_pool: str | None = None
+    node_model: str | None = None
+    cpu_architecture: str | None = None
+    region: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class MetadataOverrides:
-    """Explicit overrides for metadata collection.
-
-    Attributes are optional; any non‑None value will override the
-    automatically detected or configured value.
-    """
+    """Environment overrides for the collector."""
 
     cluster_name: str | None = None
     cluster_type: str | None = None
@@ -37,21 +85,10 @@ class MetadataOverrides:
     node_model: str | None = None
     cpu_architecture: str | None = None
     region: str | None = None
-    # Additional test metadata overrides
-    test_metadata: TestMetadata | None = None
 
 
 class MetadataCollector:
-    """Collects environment and test metadata using typed detectors and builders.
-
-    The collector orchestrates:
-        1. Loading configuration (typed `CollectorConfig`).
-        2. Running local and Kubernetes detectors.
-        3. Building `EnvironmentSpecification` via `EnvironmentBuilder`.
-        4. Building `PerformanceRunMetadata` via `RunMetadataBuilder`.
-
-    Detectors and builders can be injected for testability.
-    """
+    """Collects environment and test metadata using typed detectors and builders."""
 
     def __init__(
         self,
@@ -66,101 +103,92 @@ class MetadataCollector:
         self._k8s_detector = k8s_detector or KubernetesClusterDetector(
             timeout=self._config.timeout_seconds
         )
-        self._env_builder = env_builder or EnvironmentBuilder()
-        self._run_builder = run_builder or RunMetadataBuilder()
-
+        # EnvironmentBuilder requires the detectors to be passed; we pass them now.
+        self._env_builder = env_builder or EnvironmentBuilder(
+            config=self._config,
+            cluster_detector=self._k8s_detector,
+            node_detector=self._local_detector,
+        )
         self._environment_cache: EnvironmentSpecification | None = None
 
     @property
     def config(self) -> CollectorConfig:
         return self._config
 
+    def _apply_environment_overrides(self, overrides: MetadataOverrides | None) -> CollectorConfig:
+        """Return a new CollectorConfig with overrides applied."""
+        if overrides is None:
+            return self._config
+        # We need to construct a new config. Since CollectorConfig is frozen,
+        # we use dataclasses.replace or build manually.
+        import dataclasses
+
+        new_config = dataclasses.replace(
+            self._config,
+            cluster=self._config.cluster,
+            kubernetes=self._config.kubernetes,
+            runtime=self._config.runtime,
+            application=self._config.application,
+        )
+        # Apply overrides to relevant sub-configs.
+        # For simplicity, we create new sub-config objects.
+        if overrides.cluster_name or overrides.cluster_type:
+            cluster = new_config.cluster or type(new_config.cluster)(name="", type="")
+            cluster = dataclasses.replace(
+                cluster,
+                name=overrides.cluster_name or cluster.name,
+                type=overrides.cluster_type or cluster.type,
+            )
+            new_config = dataclasses.replace(new_config, cluster=cluster)
+
+        if overrides.node_count is not None or overrides.kubernetes_version is not None:
+            k8s = new_config.kubernetes or type(new_config.kubernetes)()
+            k8s = dataclasses.replace(
+                k8s,
+                node_count=overrides.node_count
+                if overrides.node_count is not None
+                else k8s.node_count,
+                version=overrides.kubernetes_version
+                if overrides.kubernetes_version is not None
+                else k8s.version,
+            )
+            new_config = dataclasses.replace(new_config, kubernetes=k8s)
+
+        if (
+            overrides.container_runtime is not None
+            or overrides.cni is not None
+            or overrides.storage_class is not None
+            or overrides.kernel is not None
+        ):
+            runtime = new_config.runtime or type(new_config.runtime)()
+            runtime = dataclasses.replace(
+                runtime,
+                container_runtime=overrides.container_runtime or runtime.container_runtime,
+                cni=overrides.cni or runtime.cni,
+                storage_class=overrides.storage_class or runtime.storage_class,
+                kernel=overrides.kernel or runtime.kernel,
+            )
+            new_config = dataclasses.replace(new_config, runtime=runtime)
+
+        return new_config
+
     def collect_environment(
         self,
         overrides: MetadataOverrides | None = None,
     ) -> EnvironmentSpecification:
-        """Collect and build environment information.
-
-        Results are cached; use `overrides` to force rebuilding with different values.
-        """
+        """Collect environment information, applying optional overrides."""
         if overrides is None and self._environment_cache is not None:
             return self._environment_cache
 
-        # 1. Detect local node info
-        node_info = self._local_detector.detect()
+        effective_config = self._apply_environment_overrides(overrides)
 
-        # 2. Detect Kubernetes cluster info (if auto_detect enabled)
-        cluster_info: ClusterInfo
-        k8s_version: str | None = None
-        node_pools: list | None = None
-        container_runtime: str | None = None
-        cni: str | None = None
-        storage_class: str | None = None
-
-        if self._config.auto_detect:
-            cluster_info = self._k8s_detector.detect()
-            if cluster_info.type.value == "k8s":
-                k8s_version = self._k8s_detector.detect_version()
-                node_pools = self._k8s_detector.detect_node_pools()
-                container_runtime = self._k8s_detector.detect_container_runtime()
-                cni = self._k8s_detector.detect_cni()
-                storage_class = self._k8s_detector.detect_storage_class()
-            else:
-                # Fallback to local/docker
-                k8s_version = None
-                node_pools = None
-                container_runtime = None
-                cni = None
-                storage_class = None
-        else:
-            # No auto-detection: use config or defaults
-            cluster_info = ClusterInfo(
-                name=self._config.cluster.name if self._config.cluster else "local",
-                type=(self._config.cluster.type if self._config.cluster else "local").lower(),
-                node_count=(self._config.kubernetes.node_count if self._config.kubernetes else 1),
-            )
-            k8s_version = self._config.kubernetes.version if self._config.kubernetes else None
-            node_pools = None
-            container_runtime = (
-                self._config.runtime.container_runtime if self._config.runtime else None
-            )
-            cni = self._config.runtime.cni if self._config.runtime else None
-            storage_class = self._config.runtime.storage_class if self._config.runtime else None
-
-        # 3. Apply overrides
-        if overrides:
-            cluster_info = ClusterInfo(
-                name=overrides.cluster_name or cluster_info.name,
-                type=ClusterType(overrides.cluster_type or cluster_info.type.value),
-                node_count=overrides.node_count or cluster_info.node_count,
-            )
-            if overrides.kubernetes_version is not None:
-                k8s_version = overrides.kubernetes_version
-            if overrides.container_runtime is not None:
-                container_runtime = overrides.container_runtime
-            if overrides.cni is not None:
-                cni = overrides.cni
-            if overrides.storage_class is not None:
-                storage_class = overrides.storage_class
-            if overrides.kernel is not None:
-                node_info = NodeInfo(
-                    os=node_info.os,
-                    kernel=overrides.kernel,
-                    architecture=node_info.architecture,
-                    resources=node_info.resources,
-                )
-
-        # 4. Build environment spec
-        env_spec = self._env_builder.build(
-            cluster_info=cluster_info,
-            node_info=node_info,
-            k8s_version=k8s_version,
-            node_pools=node_pools,
-            container_runtime=container_runtime,
-            cni=cni,
-            storage_class=storage_class,
-            config=self._config,
+        # Create a new EnvironmentBuilder with the effective config.
+        builder = EnvironmentBuilder(
+            config=effective_config,
+            cluster_detector=self._k8s_detector,
+            node_detector=self._local_detector,
         )
+        env_spec = builder.build()
 
         if overrides is None:
             self._environment_cache = env_spec
@@ -173,25 +201,110 @@ class MetadataCollector:
         test_metadata: TestMetadata | None = None,
         environment_overrides: MetadataOverrides | None = None,
     ) -> PerformanceRunMetadata:
-        """Collect complete test metadata and build the Pydantic model.
-
-        Args:
-            test_name: Name of the test (suite).
-            status: Initial run status (mapped to RunStatus).
-            test_metadata: Structured test parameters.
-            environment_overrides: Optional environment overrides.
-
-        Returns:
-            A fully populated PerformanceRunMetadata.
-        """
+        """Collect full test metadata and return the Pydantic model."""
         env_spec = self.collect_environment(overrides=environment_overrides)
 
         meta = test_metadata or TestMetadata()
-        return self._run_builder.build(
+        run_meta_config = self._to_run_metadata_config(test_name, status, meta)
+
+        builder = RunMetadataBuilder(run_meta_config)
+        return builder.build(env_spec)
+
+    @staticmethod
+    def _to_run_metadata_config(
+        test_name: str,
+        status: str,
+        meta: TestMetadata,
+    ) -> RunMetadataBuildConfig:
+        """Convert TestMetadata to RunMetadataBuildConfig."""
+        return RunMetadataBuildConfig(
             test_name=test_name,
             status=status,
-            env_spec=env_spec,
-            test_metadata=meta,
+            run=RunConfig(
+                profile=meta.test_profile,
+                trigger=meta.trigger_type,
+                policy_version=meta.policy_version,
+                notes=meta.notes,
+            ),
+            test=TestConfig(
+                tool=meta.tool,
+                tool_version=meta.tool_version or "unknown",
+                test_type=meta.test_type,
+                scenario=meta.scenario,
+                workload_version=None,  # not in TestMetadata
+                config_hash=meta.configuration_hash,
+            ),
+            candidate=CandidateConfig(
+                git_sha=meta.git_sha,
+                image_digest=None,
+                version=meta.version,
+                branch=meta.branch,
+                configuration_hash=meta.configuration_hash,
+                feature_flags=meta.feature_flags,
+                tags=None,
+                thresholds=None,
+                database_migration_version=meta.database_migration_version,
+            ),
+            runtime=RunRuntimeConfig(
+                replicas=meta.replicas,
+                cpu_requests=meta.cpu_requests,
+                cpu_limits=meta.cpu_limits,
+                memory_requests=meta.memory_requests,
+                memory_limits=meta.memory_limits,
+                hpa=meta.hpa,
+            )
+            if any(
+                v is not None
+                for v in [
+                    meta.replicas,
+                    meta.cpu_requests,
+                    meta.cpu_limits,
+                    meta.memory_requests,
+                    meta.memory_limits,
+                    meta.hpa,
+                ]
+            )
+            else None,
+            data=DataConfig(
+                dataset_id=meta.dataset_id,
+                dataset_version=meta.dataset_version,
+                database_size=meta.database_size,
+                seed_version=meta.seed_version,
+            )
+            if any(
+                v is not None
+                for v in [
+                    meta.dataset_id,
+                    meta.dataset_version,
+                    meta.database_size,
+                    meta.seed_version,
+                ]
+            )
+            else None,
+            phases=PhasesConfig(
+                provision_start=meta.provision_start,
+                warmup_start=meta.warmup_start,
+                measurement_start=meta.measurement_start,
+                measurement_end=meta.measurement_end,
+                cooldown_end=meta.cooldown_end,
+            )
+            if any(
+                v is not None
+                for v in [
+                    meta.provision_start,
+                    meta.warmup_start,
+                    meta.measurement_start,
+                    meta.measurement_end,
+                    meta.cooldown_end,
+                ]
+            )
+            else None,
+            environment=EnvironmentOverrideConfig(
+                node_pool=meta.node_pool,
+                node_model=meta.node_model,
+                cpu_architecture=meta.cpu_architecture,
+                region=meta.region,
+            ),
         )
 
 
@@ -200,9 +313,7 @@ class MetadataCollector:
 # -----------------------------------------------------------------------------
 
 
-def get_metadata_collector(
-    env_type: str | None = None,
-) -> MetadataCollector:
+def get_metadata_collector(env_type: str | None = None) -> MetadataCollector:
     """Factory function that returns a MetadataCollector with config loaded."""
     config = load_collector_config(env_type)
     return MetadataCollector(config=config)
@@ -213,18 +324,11 @@ def collect_run_metadata(
     status: str = "CREATED",
     test_metadata: TestMetadata | None = None,
     env_type: str | None = None,
+    environment_overrides: MetadataOverrides | None = None,
 ) -> dict[str, Any]:
-    """Convenience function to collect run metadata and return as a dict.
-
-    Args:
-        test_name: Name of the test.
-        status: Initial status.
-        test_metadata: Structured test parameters.
-        env_type: Environment type for configuration loading.
-
-    Returns:
-        Dictionary representation of the run metadata.
-    """
+    """Convenience function to collect run metadata and return as a dict."""
     collector = get_metadata_collector(env_type)
-    metadata = collector.collect_test_metadata(test_name, status, test_metadata)
+    metadata = collector.collect_test_metadata(
+        test_name, status, test_metadata, environment_overrides
+    )
     return metadata.model_dump(exclude_none=True)

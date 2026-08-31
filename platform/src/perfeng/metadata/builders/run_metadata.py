@@ -1,290 +1,171 @@
-"""Builder for PerformanceRunMetadata."""
+"""PerformanceRunMetadata builder and environment converter."""
 
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
 
 from perfeng.generated.environment import EnvironmentSpecification
 from perfeng.generated.run_metadata import (
     Candidate,
     Data,
-    Hpa,
     PerformanceRunMetadata,
     Phases,
-    Profile,
     Run,
     Test,
-    Trigger,
 )
 from perfeng.generated.run_metadata import Environment as RunEnvironment
 from perfeng.generated.run_metadata import Runtime as RunRuntime
-from perfeng.generated.run_metadata import Status as RunStatus
-from perfeng.generated.run_metadata import Tool as TestTool
-from perfeng.generated.run_metadata import Type as TestType
-
-
-@dataclass(frozen=True, slots=True)
-class TestMetadata:
-    """Structured test parameters used to build run metadata.
-
-    All fields are optional and correspond to the high‑level metadata model.
-    """
-
-    test_profile: str = "regression"
-    trigger_type: str = "manual"
-    tool: str = "k6"
-    test_type: str = "api"
-    tool_version: str | None = None
-    scenario: str | None = None
-    git_sha: str = "0" * 40
-    version: str | None = None
-    branch: str | None = None
-    configuration_hash: str | None = None
-    feature_flags: dict[str, Any] = field(default_factory=dict)
-    database_migration_version: str | None = None
-
-    # Runtime resources
-    replicas: int | None = None
-    cpu_requests: str | None = None
-    cpu_limits: str | None = None
-    memory_requests: str | None = None
-    memory_limits: str | None = None
-    hpa: Hpa | None = None
-
-    # Data
-    dataset_id: str | None = None
-    dataset_version: str | None = None
-    database_size: str | None = None
-    seed_version: str | None = None
-
-    # Phases
-    provision_start: datetime | None = None
-    warmup_start: datetime | None = None
-    measurement_start: datetime | None = None
-    measurement_end: datetime | None = None
-    cooldown_end: datetime | None = None
-
-    # Additional
-    policy_version: str | None = None
-    notes: str | None = None
-    node_pool: str | None = None
-    node_model: str | None = None
-    cpu_architecture: str | None = None
-    region: str | None = None
+from perfeng.metadata.builders.config import EnvironmentOverrideConfig, RunMetadataBuildConfig
+from perfeng.metadata.builders.mappers import (
+    PROFILE_MAPPER,
+    STATUS_MAPPER,
+    TOOL_MAPPER,
+    TRIGGER_MAPPER,
+    TYPE_MAPPER,
+)
 
 
 class RunMetadataBuilder:
-    """Build a complete PerformanceRunMetadata instance from typed inputs."""
+    """Builds PerformanceRunMetadata from typed config and a built EnvironmentSpecification."""
 
-    _STATUS_MAP = {
-        "created": RunStatus.CREATED,
-        "validating": RunStatus.VALIDATING,
-        "provisioning": RunStatus.PROVISIONING,
-        "warming_up": RunStatus.WARMING_UP,
-        "running": RunStatus.RUNNING,
-        "collecting": RunStatus.COLLECTING,
-        "analyzing": RunStatus.ANALYZING,
-        "reporting": RunStatus.REPORTING,
-        "completed": RunStatus.COMPLETED,
-        "invalid": RunStatus.INVALID,
-        "aborted": RunStatus.ABORTED,
-        "infrastructure_failure": RunStatus.INFRASTRUCTURE_FAILURE,
-        "test_failure": RunStatus.TEST_FAILURE,
-        "inconclusive": RunStatus.INCONCLUSIVE,
-    }
+    def __init__(self, config: RunMetadataBuildConfig) -> None:
+        self._config = config
 
-    _PROFILE_MAP = {
-        "smoke": Profile.smoke,
-        "average": Profile.average,
-        "regression": Profile.regression,
-        "stress": Profile.stress,
-        "capacity": Profile.capacity,
-        "soak": Profile.soak,
-    }
-
-    _TRIGGER_MAP = {
-        "manual": Trigger.manual,
-        "ci": Trigger.ci,
-        "schedule": Trigger.schedule,
-        "bisect": Trigger.bisect,
-        "release": Trigger.release,
-    }
-
-    _TOOL_MAP = {
-        "k6": TestTool.k6,
-        "playwright": TestTool.playwright,
-        "kube-burner": TestTool.kube_burner,
-        "benchmark-operator": TestTool.benchmark_operator,
-    }
-
-    _TYPE_MAP = {
-        "api": TestType.api,
-        "browser": TestType.browser,
-        "kubernetes": TestType.kubernetes,
-        "infrastructure": TestType.infrastructure,
-    }
-
-    def build(
-        self,
-        test_name: str,
-        status: str,
-        env_spec: EnvironmentSpecification,
-        test_metadata: TestMetadata,
-    ) -> PerformanceRunMetadata:
-        """Create a PerformanceRunMetadata instance."""
-        run = self._build_run(test_name, status, test_metadata)
-        test = self._build_test(test_name, test_metadata)
-        candidate = self._build_candidate(test_metadata)
-        env = self._build_environment(env_spec, test_metadata)
-        runtime = self._build_runtime(test_metadata)
-        data = self._build_data(test_metadata)
-        phases = self._build_phases(test_metadata)
-
+    def build(self, env_spec: EnvironmentSpecification) -> PerformanceRunMetadata:
         return PerformanceRunMetadata(
-            run=run,
-            test=test,
-            candidate=candidate,
-            environment=env,
-            runtime=runtime,
-            data=data,
-            phases=phases,
+            run=self._build_run(),
+            test=self._build_test(),
+            candidate=self._build_candidate(),
+            environment=EnvironmentConverter.convert(env_spec, self._config.environment),
+            runtime=self._build_runtime(),
+            data=self._build_data(),
+            phases=self._build_phases(),
         )
 
-    def _build_run(self, test_name: str, status: str, meta: TestMetadata) -> Run:
+    def _build_run(self) -> Run:
+        cfg = self._config.run
         now = datetime.now(UTC)
-        suffix = uuid.uuid4().hex[:8]
-        run_id = f"perf-{now.strftime('%Y%m%d-%H%M%S')}-{suffix}"
-
-        run_status = self._STATUS_MAP.get(status.lower(), RunStatus.CREATED)
-        profile = self._PROFILE_MAP.get(meta.test_profile.lower(), Profile.regression)
-        trigger = self._TRIGGER_MAP.get(meta.trigger_type.lower(), Trigger.manual)
+        run_id = f"perf-{now.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:8]}"
 
         return Run(
             id=run_id,
-            suite=test_name,
-            profile=profile,
+            suite=self._config.test_name,
+            profile=PROFILE_MAPPER.map(cfg.profile),
             timestamp=now,
-            trigger=trigger,
-            status=run_status,
-            policyVersion=meta.policy_version,
-            notes=meta.notes,
+            trigger=TRIGGER_MAPPER.map(cfg.trigger),
+            status=STATUS_MAPPER.map(self._config.status),
+            policyVersion=cfg.policy_version,
+            notes=cfg.notes,
         )
 
-    def _build_test(self, test_name: str, meta: TestMetadata) -> Test:
-        tool = self._TOOL_MAP.get(meta.tool.lower(), TestTool.k6)
-        test_type = self._TYPE_MAP.get(meta.test_type.lower(), TestType.api)
-
+    def _build_test(self) -> Test:
+        cfg = self._config.test
         return Test(
-            type=test_type,
-            tool=tool,
-            toolVersion=meta.tool_version or "unknown",
-            scenario=meta.scenario or test_name,
-            workloadVersion=None,  # set via meta if needed later
-            configHash=meta.configuration_hash,
+            type=TYPE_MAPPER.map(cfg.test_type),
+            tool=TOOL_MAPPER.map(cfg.tool),
+            toolVersion=cfg.tool_version,
+            scenario=cfg.scenario or self._config.test_name,
+            workloadVersion=cfg.workload_version,
+            configHash=cfg.config_hash,
         )
 
-    def _build_candidate(self, meta: TestMetadata) -> Candidate:
-        feature_flags = meta.feature_flags if meta.feature_flags else None
+    def _build_candidate(self) -> Candidate:
+        cfg = self._config.candidate
+        feature_flags = dict(cfg.feature_flags)
+        if cfg.tags is not None:
+            feature_flags["tags"] = cfg.tags
+        if cfg.thresholds is not None:
+            feature_flags["thresholds"] = cfg.thresholds
+
         return Candidate(
-            gitSha=meta.git_sha,
-            imageDigest=None,  # not in TestMetadata yet
-            version=meta.version,
-            branch=meta.branch,
-            configurationHash=meta.configuration_hash,
-            featureFlags=feature_flags,
-            databaseMigrationVersion=meta.database_migration_version,
+            gitSha=cfg.git_sha,
+            imageDigest=cfg.image_digest,
+            version=cfg.version,
+            branch=cfg.branch,
+            configurationHash=cfg.configuration_hash,
+            featureFlags=feature_flags if feature_flags else None,
+            databaseMigrationVersion=cfg.database_migration_version,
         )
 
-    def _build_environment(
-        self, env_spec: EnvironmentSpecification, meta: TestMetadata
+    def _build_runtime(self) -> RunRuntime | None:
+        cfg = self._config.runtime
+        if cfg is None or not self._has_any_field(cfg):
+            return None
+        return RunRuntime(
+            replicas=cfg.replicas,
+            cpuRequests=cfg.cpu_requests,
+            cpuLimits=cfg.cpu_limits,
+            memoryRequests=cfg.memory_requests,
+            memoryLimits=cfg.memory_limits,
+            hpa=cfg.hpa,
+        )
+
+    def _build_data(self) -> Data | None:
+        cfg = self._config.data
+        if cfg is None or not self._has_any_field(cfg):
+            return None
+        return Data(
+            datasetId=cfg.dataset_id,
+            datasetVersion=cfg.dataset_version,
+            databaseSize=cfg.database_size,
+            seedVersion=cfg.seed_version,
+        )
+
+    def _build_phases(self) -> Phases | None:
+        cfg = self._config.phases
+        if cfg is None or not self._has_any_field(cfg):
+            return None
+        return Phases(
+            provisionStart=cfg.provision_start,
+            warmupStart=cfg.warmup_start,
+            measurementStart=cfg.measurement_start,
+            measurementEnd=cfg.measurement_end,
+            cooldownEnd=cfg.cooldown_end,
+        )
+
+    @staticmethod
+    def _has_any_field(dataclass_instance) -> bool:
+        return any(v is not None for v in dataclass_instance.__dict__.values())
+
+
+class EnvironmentConverter:
+    """Converts EnvironmentSpecification into the run-metadata Environment model."""
+
+    @classmethod
+    def convert(
+        cls,
+        env_spec: EnvironmentSpecification,
+        overrides: EnvironmentOverrideConfig,
     ) -> RunEnvironment:
         kubernetes = env_spec.kubernetes
         runtime = env_spec.runtime
 
-        node_pool = None
-        cpu_arch = None
+        first_pool = None
         if kubernetes and kubernetes.nodePools and len(kubernetes.nodePools) > 0:
             first_pool = kubernetes.nodePools[0]
+
+        node_pool = overrides.node_pool
+        if node_pool is None and first_pool is not None:
             node_pool = first_pool.name
-            if first_pool.cpuArchitecture:
-                cpu_arch = first_pool.cpuArchitecture.value
+
+        cpu_arch = overrides.cpu_architecture
+        if cpu_arch is None and first_pool is not None and first_pool.cpuArchitecture:
+            cpu_arch = first_pool.cpuArchitecture.value
 
         k8s_version = kubernetes.version if kubernetes and kubernetes.version else "0.0.0"
 
         return RunEnvironment(
             cluster=env_spec.cluster,
             kubernetesVersion=k8s_version,
-            nodePool=meta.node_pool or node_pool,
-            nodeModel=meta.node_model,
-            cpuArchitecture=meta.cpu_architecture or cpu_arch,
+            nodePool=node_pool,
+            nodeModel=overrides.node_model,
+            cpuArchitecture=cpu_arch,
             kernel=runtime.kernel if runtime else None,
             containerRuntime=runtime.containerRuntime if runtime else None,
             cni=runtime.cni if runtime else None,
             storageClass=runtime.storageClass if runtime else None,
             fingerprint=env_spec.fingerprint,
             nodeCount=kubernetes.nodeCount if kubernetes else None,
-            region=meta.region,
+            region=overrides.region,
         )
-
-    def _build_runtime(self, meta: TestMetadata) -> RunRuntime | None:
-        if any(
-            v is not None
-            for v in [
-                meta.replicas,
-                meta.cpu_requests,
-                meta.cpu_limits,
-                meta.memory_requests,
-                meta.memory_limits,
-                meta.hpa,
-            ]
-        ):
-            return RunRuntime(
-                replicas=meta.replicas,
-                cpuRequests=meta.cpu_requests,
-                cpuLimits=meta.cpu_limits,
-                memoryRequests=meta.memory_requests,
-                memoryLimits=meta.memory_limits,
-                hpa=meta.hpa,
-            )
-        return None
-
-    def _build_data(self, meta: TestMetadata) -> Data | None:
-        if any(
-            v is not None
-            for v in [
-                meta.dataset_id,
-                meta.dataset_version,
-                meta.database_size,
-                meta.seed_version,
-            ]
-        ):
-            return Data(
-                datasetId=meta.dataset_id,
-                datasetVersion=meta.dataset_version,
-                databaseSize=meta.database_size,
-                seedVersion=meta.seed_version,
-            )
-        return None
-
-    def _build_phases(self, meta: TestMetadata) -> Phases | None:
-        if any(
-            v is not None
-            for v in [
-                meta.provision_start,
-                meta.warmup_start,
-                meta.measurement_start,
-                meta.measurement_end,
-                meta.cooldown_end,
-            ]
-        ):
-            return Phases(
-                provisionStart=meta.provision_start,
-                warmupStart=meta.warmup_start,
-                measurementStart=meta.measurement_start,
-                measurementEnd=meta.measurement_end,
-                cooldownEnd=meta.cooldown_end,
-            )
-        return None

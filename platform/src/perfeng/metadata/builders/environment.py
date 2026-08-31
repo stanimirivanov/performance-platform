@@ -1,100 +1,45 @@
-"""Builder for EnvironmentSpecification."""
+"""EnvironmentSpecification builder with injected detectors."""
 
 from __future__ import annotations
 
-from typing import TypeVar
-
-from perfeng.generated.environment import (
-    Application,
-    EnvironmentSpecification,
-    Kubernetes,
-    NodePool,
-    Runtime,
-)
+from perfeng.generated.environment import Application, EnvironmentSpecification, Kubernetes, Runtime
+from perfeng.metadata.builders.fingerprint import DefaultFingerprintGenerator, FingerprintGenerator
 from perfeng.metadata.config import CollectorConfig
-from perfeng.metadata.detectors import ClusterInfo, NodeInfo
-from perfeng.metadata.fingerprint import generate_fingerprint
-
-T = TypeVar("T")
-
-
-def _first_not_none(*values: T | None, default: T | None = None) -> T | None:
-    """Return the first non‑None value, or a default."""
-    for value in values:
-        if value is not None:
-            return value
-    return default
+from perfeng.metadata.detectors import KubernetesClusterDetector, LocalNodeDetector
 
 
 class EnvironmentBuilder:
-    """Construct an EnvironmentSpecification from detected data and config."""
+    """Builds an EnvironmentSpecification from typed config and live detectors."""
 
-    def build(
+    def __init__(
         self,
-        cluster_info: ClusterInfo,
-        node_info: NodeInfo,
-        k8s_version: str | None,
-        node_pools: list[NodePool] | None,
-        container_runtime: str | None,
-        cni: str | None,
-        storage_class: str | None,
         config: CollectorConfig,
-    ) -> EnvironmentSpecification:
-        """Combine detected information and configuration into a validated model."""
-        # Resolve cluster name with a guaranteed string fallback
-        cluster_name = (config.cluster.name if config.cluster else cluster_info.name) or "local"
+        *,
+        cluster_detector: KubernetesClusterDetector | None = None,
+        node_detector: LocalNodeDetector | None = None,
+        fingerprint_generator: FingerprintGenerator | None = None,
+    ) -> None:
+        self._config = config
+        self._cluster_detector = cluster_detector
+        self._node_detector = node_detector or LocalNodeDetector()
+        self._fingerprint_generator = fingerprint_generator or DefaultFingerprintGenerator()
 
-        node_count = _first_not_none(
-            config.kubernetes.node_count if config.kubernetes else None,
-            cluster_info.node_count,
-            1,
-        )
+    def build(self) -> EnvironmentSpecification:
+        """Assemble the full environment spec."""
+        detected_cluster = self._detect_cluster()
+        detected_node = self._node_detector.detect()
 
-        # Kubernetes object
-        kubernetes = Kubernetes(
-            version=_first_not_none(
-                k8s_version,
-                config.kubernetes.version if config.kubernetes else None,
-            ),
-            nodeCount=node_count,
-            nodePools=node_pools,
-        )
+        cluster_name = self._resolve_cluster_name(detected_cluster)
+        kubernetes = self._build_kubernetes(detected_cluster)
+        runtime = self._build_runtime(detected_cluster, detected_node)
+        application = self._build_application()
 
-        # Runtime object
-        runtime = Runtime(
-            containerRuntime=_first_not_none(
-                container_runtime,
-                config.runtime.container_runtime if config.runtime else None,
-            ),
-            cni=_first_not_none(
-                cni,
-                config.runtime.cni if config.runtime else None,
-            ),
-            storageClass=_first_not_none(
-                storage_class,
-                config.runtime.storage_class if config.runtime else None,
-            ),
-            kernel=_first_not_none(
-                node_info.kernel,
-                config.runtime.kernel if config.runtime else None,
-            ),
-        )
-
-        # Application object (if configured)
-        application = None
-        if config.application:
-            application = Application(
-                configurationHash=config.application.configuration_hash,
-                featureFlags=config.application.feature_flags,
-            )
-
-        # Generate fingerprint
-        fingerprint = generate_fingerprint(
+        fingerprint = self._fingerprint_generator.generate(
             cluster_name=cluster_name,
             k8s_version=kubernetes.version,
-            node_os=node_info.os,
+            node_os=detected_node.os,
             container_runtime=runtime.containerRuntime,
-            excludes=list(config.fingerprint_excludes),
+            excludes=list(self._config.fingerprint_excludes),
         )
 
         return EnvironmentSpecification(
@@ -104,4 +49,69 @@ class EnvironmentBuilder:
             runtime=runtime,
             application=application,
             compatibility=None,
+        )
+
+    def _detect_cluster(self):
+        if self._config.auto_detect and self._cluster_detector is not None:
+            return self._cluster_detector.detect()
+        return None
+
+    def _resolve_cluster_name(self, detected) -> str:
+        return (
+            (self._config.cluster.name if self._config.cluster else None)
+            or (detected.name if detected else None)
+            or "local"
+        )
+
+    def _build_kubernetes(self, detected_cluster) -> Kubernetes:
+        cfg = self._config.kubernetes
+
+        node_count = cfg.node_count if cfg else None
+        if node_count is None and detected_cluster is not None:
+            node_count = detected_cluster.node_count
+        if node_count is None:
+            node_count = 1
+
+        version = cfg.version if cfg else None
+        if version is None and self._config.auto_detect and self._cluster_detector is not None:
+            version = self._cluster_detector.detect_version()
+
+        node_pools = None
+        if self._config.auto_detect and self._cluster_detector is not None:
+            node_pools = self._cluster_detector.detect_node_pools()
+
+        return Kubernetes(
+            version=version,
+            nodeCount=node_count,
+            nodePools=node_pools,
+        )
+
+    def _build_runtime(self, detected_cluster, detected_node) -> Runtime:
+        cfg = self._config.runtime
+
+        container_runtime = cfg.container_runtime if cfg else None
+        cni = cfg.cni if cfg else None
+        storage_class = cfg.storage_class if cfg else None
+
+        if self._config.auto_detect and self._cluster_detector is not None:
+            container_runtime = (
+                container_runtime or self._cluster_detector.detect_container_runtime()
+            )
+            cni = cni or self._cluster_detector.detect_cni()
+            storage_class = storage_class or self._cluster_detector.detect_storage_class()
+
+        return Runtime(
+            containerRuntime=container_runtime,
+            cni=cni,
+            storageClass=storage_class,
+            kernel=(cfg.kernel if cfg else None) or detected_node.kernel,
+        )
+
+    def _build_application(self) -> Application | None:
+        cfg = self._config.application
+        if cfg is None:
+            return None
+        return Application(
+            configurationHash=cfg.configuration_hash,
+            featureFlags=cfg.feature_flags or {},
         )
