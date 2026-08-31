@@ -90,7 +90,7 @@ class RunMetadataBuilder:
 
     def _build_runtime(self) -> RunRuntime | None:
         cfg = self._config.runtime
-        if cfg is None or not self._has_any_field(cfg):
+        if cfg is None:
             return None
         return RunRuntime(
             replicas=cfg.replicas,
@@ -103,7 +103,7 @@ class RunMetadataBuilder:
 
     def _build_data(self) -> Data | None:
         cfg = self._config.data
-        if cfg is None or not self._has_any_field(cfg):
+        if cfg is None:
             return None
         return Data(
             datasetId=cfg.dataset_id,
@@ -114,7 +114,7 @@ class RunMetadataBuilder:
 
     def _build_phases(self) -> Phases | None:
         cfg = self._config.phases
-        if cfg is None or not self._has_any_field(cfg):
+        if cfg is None:
             return None
         return Phases(
             provisionStart=cfg.provision_start,
@@ -124,20 +124,9 @@ class RunMetadataBuilder:
             cooldownEnd=cfg.cooldown_end,
         )
 
-    @staticmethod
-    def _has_any_field(dataclass_instance) -> bool:
-        from dataclasses import fields
-
-        return any(
-            getattr(dataclass_instance, f.name) is not None for f in fields(dataclass_instance)
-        )
-
 
 class EnvironmentConverter:
-    """Converts EnvironmentSpecification into the run-metadata Environment model.
-
-    Encapsulates deep traversal using helper methods, avoiding Law of Demeter violations.
-    """
+    """Converts EnvironmentSpecification into the run-metadata Environment model."""
 
     @classmethod
     def convert(
@@ -171,10 +160,8 @@ class EnvironmentConverter:
 
     @staticmethod
     def _primary_pool(k8s: Kubernetes | None) -> NodePool | None:
-        """Return the first node pool, if any."""
         return k8s.nodePools[0] if k8s and k8s.nodePools else None
 
     @staticmethod
     def _cpu_arch(pool: NodePool | None) -> str | None:
-        """Extract the CPU architecture from a node pool, safely."""
         return pool.cpuArchitecture.value if pool and pool.cpuArchitecture else None
