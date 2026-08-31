@@ -36,7 +36,7 @@ def collect_metadata_demo():
         cpu_limits="1000m",
         memory_requests="512Mi",
         memory_limits="1024Mi",
-        hpa={"enabled": True, "min_replicas": 2, "max_replicas": 10, "target_cpu_utilization": 70},
+        hpa={"enabled": True, "minReplicas": 2, "maxReplicas": 10, "targetCpuUtilization": 70},
         dataset_id="checkout-dataset",
         dataset_version="2.0.0",
         database_size="10GB",
@@ -53,7 +53,7 @@ def collect_metadata_demo():
     )
 
     # Convert to dictionary with all fields
-    return run_metadata_model.model_dump(exclude_none=True)
+    return run_metadata_model.model_dump(mode="json", exclude_none=True)
 
 
 def demo_collect_from_environment():
@@ -79,7 +79,7 @@ def demo_collect_from_environment():
 
     # Show JSON output
     print("\n=== JSON Output ===")
-    env_json = json.dumps(env.model_dump(exclude_none=True), indent=2)
+    env_json = json.dumps(env.model_dump(mode="json", exclude_none=True), indent=2)
     print(env_json)
 
 
