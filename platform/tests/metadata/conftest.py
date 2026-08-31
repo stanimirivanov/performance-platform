@@ -50,7 +50,7 @@ def collector_config_no_detect() -> CollectorConfig:
 
 
 @pytest.fixture
-def fake_local_detector() -> LocalNodeDetector:
+def fake_local_detector() -> Generator[LocalNodeDetector, None, None]:
     """LocalNodeDetector with mocked psutil to return predictable values."""
     detector = LocalNodeDetector()
     with patch("perfeng.metadata.detectors.local.psutil") as mock_psutil:
