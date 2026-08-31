@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from perfeng.generated.environment import Application, EnvironmentSpecification, Kubernetes, Runtime
+from perfeng.metadata import fingerprint as fp_module
 from perfeng.metadata.builders.fingerprint import DefaultFingerprintGenerator, FingerprintGenerator
 from perfeng.metadata.detectors import KubernetesClusterDetector, LocalNodeDetector
 
@@ -62,7 +63,9 @@ class EnvironmentBuilder:
         self._config = config
         self._cluster_detector = cluster_detector
         self._node_detector = node_detector or LocalNodeDetector()
-        self._fingerprint_generator = fingerprint_generator or DefaultFingerprintGenerator()
+        self._fingerprint_generator = fingerprint_generator or DefaultFingerprintGenerator(
+            fp_module.generate_fingerprint
+        )
 
     def build(self) -> EnvironmentSpecification:
         detected_cluster = self._detect_cluster()

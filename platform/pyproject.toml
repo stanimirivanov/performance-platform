@@ -9,6 +9,7 @@ dependencies = [
     "alembic>=1.19.1",
     "asyncpg>=0.31.0",
     "boto3>=1.43.78",
+    "dacite>=1.9.2",
     "docker>=7.2.0",
     "fastapi>=0.141.1",
     "httpx>=0.28.1",

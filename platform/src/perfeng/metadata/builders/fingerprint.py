@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Protocol
+from collections.abc import Callable
+from typing import Protocol
 
 
 class FingerprintGenerator(Protocol):
@@ -20,14 +21,10 @@ class FingerprintGenerator(Protocol):
 
 
 class DefaultFingerprintGenerator:
-    """Thin wrapper around the existing fingerprint module."""
+    """Thin wrapper around a provided fingerprint function."""
 
-    def __init__(self, module: Any | None = None) -> None:
-        if module is None:
-            from perfeng.metadata import fingerprint as _fp
-
-            module = _fp
-        self._module = module
+    def __init__(self, generate_fn: Callable[..., str]) -> None:
+        self._generate = generate_fn
 
     def generate(
         self,
@@ -38,7 +35,7 @@ class DefaultFingerprintGenerator:
         container_runtime: str | None,
         excludes: list[str] | None = None,
     ) -> str:
-        return self._module.generate_fingerprint(
+        return self._generate(
             cluster_name=cluster_name,
             k8s_version=k8s_version,
             node_os=node_os,
