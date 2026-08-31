@@ -1,5 +1,5 @@
 """
-Unit tests for the new ConfigLoader.
+Tests for configuration loading and typed models.
 """
 
 import os
@@ -7,21 +7,20 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+import yaml
 
 from perfeng.metadata.config.loader import ConfigLoader, load_collector_config
 from perfeng.metadata.config.models import CollectorConfig
 
 
 @pytest.fixture
-def temp_config_dir(tmp_path) -> Path:
+def temp_config_dir(tmp_path):
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     return config_dir
 
 
 def write_yaml(path: Path, data: dict):
-    import yaml
-
     path.write_text(yaml.safe_dump(data))
 
 
@@ -50,7 +49,11 @@ class TestConfigLoader:
         with patch.dict(os.environ, {"PERFENG_CONFIG_DIR": str(temp_config_dir)}):
             loader = ConfigLoader("local")
             config = loader.load()
+
+            assert config.cluster is not None
             assert config.cluster.name == "test-cluster"
+
+            assert config.kubernetes is not None
             assert config.kubernetes.version == "v1.28.0"
 
     def test_env_variables_override(self, temp_config_dir):
@@ -66,7 +69,11 @@ class TestConfigLoader:
             loader = ConfigLoader("local")
             config = loader.load()
             assert config.auto_detect is False
+
+            assert config.cluster is not None
             assert config.cluster.name == "env-cluster"
+
+            assert config.kubernetes is not None
             assert config.kubernetes.node_count == 5
 
     def test_load_collector_config_function(self):

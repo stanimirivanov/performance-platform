@@ -34,9 +34,12 @@ class EnvironmentBuilder:
         runtime = self._build_runtime(detected_cluster, detected_node)
         application = self._build_application()
 
+        # Kubernetes may be None; extract version safely
+        k8s_version = kubernetes.version if kubernetes else None
+
         fingerprint = self._fingerprint_generator.generate(
             cluster_name=cluster_name,
-            k8s_version=kubernetes.version,
+            k8s_version=k8s_version,
             node_os=detected_node.os,
             container_runtime=runtime.containerRuntime,
             excludes=list(self._config.fingerprint_excludes),
@@ -63,22 +66,26 @@ class EnvironmentBuilder:
             or "local"
         )
 
-    def _build_kubernetes(self, detected_cluster) -> Kubernetes:
+    def _build_kubernetes(self, detected_cluster) -> Kubernetes | None:
         cfg = self._config.kubernetes
 
-        node_count = cfg.node_count if cfg else None
-        if node_count is None and detected_cluster is not None:
-            node_count = detected_cluster.node_count
-        if node_count is None:
-            node_count = 1
+        # If auto-detect is off and no Kubernetes config provided, do not build Kubernetes
+        if cfg is None and not self._config.auto_detect:
+            return None
 
+        node_count = cfg.node_count if cfg else None
         version = cfg.version if cfg else None
-        if version is None and self._config.auto_detect and self._cluster_detector is not None:
-            version = self._cluster_detector.detect_version()
 
         node_pools = None
         if self._config.auto_detect and self._cluster_detector is not None:
+            if version is None:
+                version = self._cluster_detector.detect_version()
+            if node_count is None and detected_cluster is not None:
+                node_count = detected_cluster.node_count
             node_pools = self._cluster_detector.detect_node_pools()
+
+        if node_count is None:
+            node_count = 1
 
         return Kubernetes(
             version=version,

@@ -16,7 +16,7 @@ class RunConfig:
 
 
 @dataclass(frozen=True, slots=True)
-class TestConfig:
+class ExecutorConfig:
     tool: str = "k6"
     tool_version: str = "unknown"
     test_type: str = "api"
@@ -80,7 +80,7 @@ class RunMetadataBuildConfig:
     test_name: str
     status: str = "created"
     run: RunConfig = field(default_factory=RunConfig)
-    test: TestConfig = field(default_factory=TestConfig)
+    test: ExecutorConfig = field(default_factory=ExecutorConfig)
     candidate: CandidateConfig = field(default_factory=CandidateConfig)
     runtime: RunRuntimeConfig | None = None
     data: DataConfig | None = None

@@ -10,11 +10,11 @@ from perfeng.metadata.builders.config import (
     CandidateConfig,
     DataConfig,
     EnvironmentOverrideConfig,
+    ExecutorConfig,
     PhasesConfig,
     RunConfig,
     RunMetadataBuildConfig,
     RunRuntimeConfig,
-    TestConfig,
 )
 from perfeng.metadata.builders.environment import EnvironmentBuilder
 from perfeng.metadata.builders.run_metadata import RunMetadataBuilder
@@ -86,7 +86,7 @@ def build_performance_run_metadata(
             policy_version=kwargs.get("policyVersion"),
             notes=kwargs.get("notes"),
         ),
-        test=TestConfig(
+        test=ExecutorConfig(
             tool=kwargs.get("tool", "k6"),
             tool_version=kwargs.get("toolVersion", "unknown"),
             test_type=kwargs.get("test_type", "api"),

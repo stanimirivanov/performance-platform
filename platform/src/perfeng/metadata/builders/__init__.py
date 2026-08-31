@@ -4,11 +4,11 @@ from perfeng.metadata.builders.config import (
     CandidateConfig,
     DataConfig,
     EnvironmentOverrideConfig,
+    ExecutorConfig,
     PhasesConfig,
     RunConfig,
     RunMetadataBuildConfig,
     RunRuntimeConfig,
-    TestConfig,
 )
 from perfeng.metadata.builders.environment import EnvironmentBuilder
 from perfeng.metadata.builders.fingerprint import DefaultFingerprintGenerator, FingerprintGenerator
@@ -38,7 +38,7 @@ __all__ = [
     "RunMetadataBuilder",
     "RunRuntimeConfig",
     "STATUS_MAPPER",
-    "TestConfig",
+    "ExecutorConfig",
     "TOOL_MAPPER",
     "TRIGGER_MAPPER",
     "TYPE_MAPPER",

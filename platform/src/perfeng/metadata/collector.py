@@ -13,10 +13,10 @@ from perfeng.metadata.builders.config import (
     CandidateConfig,
     DataConfig,
     EnvironmentOverrideConfig,
+    ExecutorConfig,
     PhasesConfig,
     RunConfig,
     RunRuntimeConfig,
-    TestConfig,
 )
 from perfeng.metadata.config import (
     ClusterConfig,
@@ -247,7 +247,7 @@ class MetadataCollector:
                 policy_version=meta.policy_version,
                 notes=meta.notes,
             ),
-            test=TestConfig(
+            test=ExecutorConfig(
                 tool=meta.tool,
                 tool_version=meta.tool_version or "unknown",
                 test_type=meta.test_type,

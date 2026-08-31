@@ -1,6 +1,8 @@
 """
-Metadata-specific fixtures.
+Fixtures for metadata package tests.
 """
+
+from __future__ import annotations
 
 import json
 from collections.abc import Generator
@@ -10,6 +12,7 @@ import pytest
 
 from perfeng.metadata.collector import MetadataCollector
 from perfeng.metadata.config import CollectorConfig
+from perfeng.metadata.detectors import LocalNodeDetector
 
 
 @pytest.fixture
@@ -30,6 +33,34 @@ def collector_config() -> CollectorConfig:
 def collector(collector_config: CollectorConfig) -> MetadataCollector:
     """Create a basic collector instance with config."""
     return MetadataCollector(config=collector_config)
+
+
+@pytest.fixture
+def collector_config_no_detect() -> CollectorConfig:
+    """Typed config with auto-detection disabled."""
+    return CollectorConfig(
+        auto_detect=False,
+        timeout_seconds=30,
+        fingerprint_excludes=(),
+        cluster=None,
+        kubernetes=None,
+        runtime=None,
+        application=None,
+    )
+
+
+@pytest.fixture
+def fake_local_detector() -> LocalNodeDetector:
+    """LocalNodeDetector with mocked psutil to return predictable values."""
+    detector = LocalNodeDetector()
+    with patch("perfeng.metadata.detectors.local.psutil") as mock_psutil:
+        mock_psutil.cpu_count.return_value = 8
+        mock_psutil.virtual_memory.return_value.total = 16 * (1024**3)
+        mock_psutil.disk_usage.return_value.total = 100 * (1024**3)
+        yield detector
+    # Note: This fixture yields inside patch context; careful with yield.
+    # Better to use a factory that returns a detector with mocked methods.
+    # We'll adjust: use a fixture that patches LocalNodeDetector.detect directly.
 
 
 @pytest.fixture
