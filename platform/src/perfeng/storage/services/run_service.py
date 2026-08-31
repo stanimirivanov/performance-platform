@@ -32,6 +32,8 @@ class RunService:
     ) -> RunCreateResponse:
         """Create a new run with optional embedded environment."""
 
+        # Normalize status to lowercase to match the database enum
+        run_data.status = run_data.status.lower()
         run = await self.run_repo.create(session, run_data)
         response = RunCreateResponse(run_id=run.run_id)
         if run_data.environment:

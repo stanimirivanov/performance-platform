@@ -1,82 +1,84 @@
-# platform/tests/integration/test_metadata_flow.py
 """
 Integration tests for the complete metadata flow.
 """
 
-from pathlib import Path
-
 import pytest
-import yaml
 
 from perfeng.generated.environment import EnvironmentSpecification
 from perfeng.generated.run_metadata import PerformanceRunMetadata, Status
+from perfeng.metadata.builders.config import (
+    CandidateConfig,
+    ExecutorConfig,
+    RunConfig,
+    RunMetadataBuildConfig,
+)
 from perfeng.metadata.collector import MetadataCollector
+from perfeng.metadata.config import CollectorConfig
+from perfeng.metadata.config.models import ClusterConfig, KubernetesConfig, RuntimeConfig
 
 
 @pytest.mark.integration
 class TestMetadataFlow:
-    """End-to-end integration tests."""
+    """End-to-end integration tests using typed config."""
 
-    def _create_temp_config(self, tmp_path: Path, config_override: dict | None = None) -> Path:
-        """Helper to create a temporary config file."""
-        default_config = {
-            "auto_detect": False,
-            "timeout_seconds": 30,
-            "fingerprint_excludes": [],
-            "environment_config": {
-                "cluster": "test-cluster",
-                "kubernetes": {"version": "v1.28.0", "nodeCount": 3},
-                "runtime": {
-                    "containerRuntime": "containerd",
-                    "cni": "calico",
-                    "storageClass": "standard",
-                    "kernel": "5.15.0",
-                },
-            },
-        }
-        if config_override:
-            # Deep merge (simplified)
-            import copy
+    def _make_collector(
+        self,
+        cluster: str = "test-cluster",
+        k8s_version: str = "v1.28.0",
+        node_count: int = 3,
+        container_runtime: str = "containerd",
+        cni: str = "calico",
+        storage_class: str = "standard",
+        kernel: str = "5.15.0",
+    ) -> MetadataCollector:
+        """Create a MetadataCollector with a fixed, non-detecting config."""
+        config = CollectorConfig(
+            auto_detect=False,
+            timeout_seconds=30,
+            fingerprint_excludes=(),
+            cluster=ClusterConfig(name=cluster, type=None),
+            kubernetes=KubernetesConfig(
+                version=k8s_version,
+                node_count=node_count,
+                node_pools=None,
+            ),
+            runtime=RuntimeConfig(
+                container_runtime=container_runtime,
+                cni=cni,
+                storage_class=storage_class,
+                kernel=kernel,
+            ),
+        )
+        return MetadataCollector(config=config)
 
-            config = copy.deepcopy(default_config)
-            for key, value in config_override.items():
-                if isinstance(value, dict) and key in config and isinstance(config[key], dict):
-                    config[key].update(value)
-                else:
-                    config[key] = value
-        else:
-            config = default_config
-
-        config_path = tmp_path / "config.yaml"
-        with open(config_path, "w") as f:
-            yaml.dump(config, f)
-        return config_path
-
-    def test_complete_collection_flow(self, tmp_path):
+    def test_complete_collection_flow(self):
         """Test complete metadata collection flow."""
-        config_path = self._create_temp_config(tmp_path)
-        collector = MetadataCollector(config_path)
+        collector = self._make_collector()
 
         env = collector.collect_environment()
         assert isinstance(env, EnvironmentSpecification)
         assert env.cluster == "test-cluster"
         assert len(env.fingerprint) == 64
 
-        # Check kubernetes is not None before accessing attributes
-        assert env.kubernetes is not None, "Kubernetes info should be present"
-        assert env.runtime is not None, "Runtime info should be present"
-
-        # Now safe to access attributes
+        assert env.kubernetes is not None
+        assert env.runtime is not None
         assert env.kubernetes.version == "v1.28.0"
         assert env.kubernetes.nodeCount == 3
 
-        # Collect test metadata
-        metadata = collector.collect_test_metadata(
+        # Build run metadata config
+        run_config = RunMetadataBuildConfig(
             test_name="integration-test",
             status="RUNNING",
-            tags=["integration"],
-            thresholds={"p95": 100},
+            run=RunConfig(profile="smoke", trigger="manual"),
+            test=ExecutorConfig(tool="k6", tool_version="0.45.0", scenario="flow.js"),
+            candidate=CandidateConfig(
+                git_sha="a" * 40,
+                version="1.0.0",
+                feature_flags={"tags": ["integration"], "thresholds": {"p95": 100}},
+            ),
         )
+
+        metadata = collector.collect_test_metadata(run_config)
 
         assert isinstance(metadata, PerformanceRunMetadata)
         assert metadata.run.suite == "integration-test"
@@ -86,13 +88,11 @@ class TestMetadataFlow:
         assert "tags" in metadata.candidate.featureFlags
         assert "thresholds" in metadata.candidate.featureFlags
 
-    def test_serialization_roundtrip(self, tmp_path):
+    def test_serialization_roundtrip(self):
         """Test that metadata can be serialized and deserialized."""
-        config_path = self._create_temp_config(tmp_path)
-        collector = MetadataCollector(config_path)
+        collector = self._make_collector()
         env = collector.collect_environment()
 
-        # Serialize to JSON
         json_str = env.model_dump_json()
         env2 = EnvironmentSpecification.model_validate_json(json_str)
 
@@ -102,24 +102,16 @@ class TestMetadataFlow:
         assert env2.kubernetes is not None
         assert env2.kubernetes.version == env.kubernetes.version
 
-    def test_environment_comparison(self, tmp_path):
+    def test_environment_comparison(self):
         """Test comparing different environments."""
-        config1_path = self._create_temp_config(tmp_path)
-        collector1 = MetadataCollector(config1_path)
-        env1 = collector1.collect_environment()
-
-        config2_path = self._create_temp_config(
-            tmp_path, {"environment_config": {"cluster": "different-cluster"}}
-        )
-        collector2 = MetadataCollector(config2_path)
-        env2 = collector2.collect_environment()
+        env1 = self._make_collector(cluster="cluster-a").collect_environment()
+        env2 = self._make_collector(cluster="cluster-b").collect_environment()
 
         assert env1.fingerprint != env2.fingerprint
 
-    def test_full_run_metadata_structure(self, tmp_path):
+    def test_full_run_metadata_structure(self):
         """Test that the collector can produce the full run metadata structure."""
-        config_path = self._create_temp_config(tmp_path)
-        collector = MetadataCollector(config_path)
+        collector = self._make_collector()
         env = collector.collect_environment()
 
         run_metadata = {

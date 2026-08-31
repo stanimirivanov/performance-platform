@@ -1,126 +1,75 @@
-"""
-Integration test fixtures.
-These fixtures may set up external dependencies like test databases,
-API clients, or real environment connections.
-"""
+"""Integration test fixtures."""
 
-import contextlib
-import subprocess
-import time
-from collections.abc import Generator
-from typing import Any
+import os
+from collections.abc import AsyncGenerator
 
-import docker
+import asyncpg
 import pytest
+import pytest_asyncio
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from perfeng.core.config import settings
 from perfeng.metadata.collector import MetadataCollector
-from perfeng.metadata.config_loader import create_collector_for_environment
-
-
-@pytest.fixture(scope="session")
-def test_postgres_container() -> Generator[dict[str, Any], None, None]:
-    """
-    Start a temporary PostgreSQL container for integration tests.
-    Requires Docker and the 'docker' Python package.
-    """
-
-    try:
-        client = docker.from_env()  # type: ignore
-    except Exception as e:
-        pytest.skip(f"Docker not available: {e}")
-
-    container_name = "perfeng_test_postgres"
-
-    # Clean up any existing container with the same name
-    try:
-        existing = client.containers.get(container_name)
-        existing.stop()
-        existing.remove()
-    except docker.errors.NotFound:  # type: ignore
-        pass
-
-    # Run PostgreSQL container
-    container = client.containers.run(
-        image="postgres:15-alpine",
-        name=container_name,
-        environment={
-            "POSTGRES_DB": "test_metadata",
-            "POSTGRES_USER": "test_user",
-            "POSTGRES_PASSWORD": "test_password",
-        },
-        ports={"5432/tcp": None},  # Random port
-        detach=True,
-        remove=True,
-    )
-
-    # Get host port safely
-    container.reload()
-    port_mapping = container.ports.get("5432/tcp")
-    if not port_mapping:
-        # Cleanup and skip
-        container.stop()
-        pytest.skip("Could not get port mapping for PostgreSQL container")
-
-    # port_mapping is a list of dicts with HostPort
-    host_port = port_mapping[0]["HostPort"]
-
-    # Wait for PostgreSQL to be ready
-    max_attempts = 30
-    for _attempt in range(max_attempts):
-        try:
-            subprocess.run(
-                [
-                    "pg_isready",
-                    "-h",
-                    "localhost",
-                    "-p",
-                    host_port,
-                    "-U",
-                    "test_user",
-                    "-d",
-                    "test_metadata",
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            break
-        except subprocess.CalledProcessError:
-            time.sleep(1)
-    else:
-        raise RuntimeError("PostgreSQL container did not start in time")
-
-    # Provide connection details
-    connection_info = {
-        "host": "localhost",
-        "port": host_port,
-        "database": "test_metadata",
-        "user": "test_user",
-        "password": "test_password",
-        "dsn": f"postgresql://test_user:test_password@localhost:{host_port}/test_metadata",
-    }
-
-    yield connection_info
-
-    # Cleanup
-    with contextlib.suppress(Exception):
-        container.stop()
+from perfeng.metadata.config import load_collector_config
 
 
 @pytest.fixture
 def integration_collector() -> MetadataCollector:
-    """Return a collector configured for integration tests (using test config)."""
-    return create_collector_for_environment("test")
+    """Return a collector configured for the 'test' environment."""
+    config = load_collector_config("test")
+    return MetadataCollector(config=config)
 
 
-@pytest.fixture
-def mock_k8s_api() -> Generator[None, None, None]:
+@pytest_asyncio.fixture(scope="session")
+async def test_postgres_container() -> str:
+    """Create (if necessary) and return the test database DSN.
+
+    Uses the application's default database URL as a starting point,
+    but replaces the database name with `metadata_test`.
     """
-    Mock the Kubernetes API for integration tests that need to simulate
-    a real cluster without actually connecting.
-    """
-    # This can be implemented using a fake Kubernetes client or by patching
-    # the subprocess calls to return predefined responses.
-    # For now, we'll just yield a placeholder.
-    # In a real implementation, you might use the 'k8s' library with a test server.
-    yield None
+    # Original async DSN from settings
+    async_dsn = settings.database_url
+    # Convert to plain postgresql:// for asyncpg (for maintenance operations)
+    plain_dsn = async_dsn.replace("postgresql+asyncpg://", "postgresql://")
+
+    # Extract base URL without database name
+    base_dsn = plain_dsn.rsplit("/", 1)[0]
+    test_db_name = "metadata_test"
+
+    # Connect to the 'postgres' maintenance database to create test DB if needed
+    maintenance_dsn = f"{base_dsn}/postgres"
+    conn = await asyncpg.connect(dsn=maintenance_dsn)
+    try:
+        exists = await conn.fetchval("SELECT 1 FROM pg_database WHERE datname = $1", test_db_name)
+        if not exists:
+            # Quote identifier? test_db_name is safe.
+            await conn.execute(f"CREATE DATABASE {test_db_name}")
+    finally:
+        await conn.close()
+
+    # Now prepare the test DSN (async variant for SQLAlchemy async engine)
+    test_async_dsn = async_dsn.rsplit("/", 1)[0] + f"/{test_db_name}"
+
+    # Run migrations on the test DB (using the sync DSN for the script)
+    # We'll set environment variable and call the migration script.
+    os.environ["DATABASE_URL"] = plain_dsn.rsplit("/", 1)[0] + f"/{test_db_name}"
+    from scripts.run_migrations import run_migrations
+
+    await run_migrations(reset=True)
+
+    return test_async_dsn
+
+
+@pytest_asyncio.fixture
+async def db_session(test_postgres_container) -> AsyncGenerator[AsyncSession, None]:
+    """Provide an AsyncSession that rolls back after each test."""
+    engine = create_async_engine(test_postgres_container)
+    async_session_factory = async_sessionmaker(
+        engine,
+        expire_on_commit=False,
+        class_=AsyncSession,
+    )
+    async with async_session_factory() as session, session.begin():
+        yield session
+        await session.rollback()
+    await engine.dispose()

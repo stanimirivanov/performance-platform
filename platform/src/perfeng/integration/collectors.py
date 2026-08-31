@@ -1,9 +1,10 @@
-"""System metric collectors."""
+"""System metric collectors with injectable dependencies."""
 
 from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
 from typing import Any
 
 import psutil
@@ -15,11 +16,16 @@ logger = logging.getLogger(__name__)
 
 
 class CpuCollector:
+    """Collects CPU usage percentage."""
+
+    def __init__(self, psutil_module: Any = psutil) -> None:
+        self._psutil = psutil_module
+
     def collect(self) -> list[Snapshot]:
         return [
             Snapshot(
                 resource_type="cpu",
-                value_current=psutil.cpu_percent(interval=None),
+                value_current=self._psutil.cpu_percent(interval=None),
                 unit="percent",
                 test_phase="steady",
                 attributes={},
@@ -28,8 +34,13 @@ class CpuCollector:
 
 
 class MemoryCollector:
+    """Collects memory usage percentage and totals."""
+
+    def __init__(self, psutil_module: Any = psutil) -> None:
+        self._psutil = psutil_module
+
     def collect(self) -> list[Snapshot]:
-        mem = psutil.virtual_memory()
+        mem = self._psutil.virtual_memory()
         return [
             Snapshot(
                 resource_type="memory",
@@ -45,11 +56,14 @@ class MemoryCollector:
 
 
 class DiskCollector:
-    def __init__(self, path: str = "/"):
+    """Collects disk usage for a given path."""
+
+    def __init__(self, path: str = "/", psutil_module: Any = psutil) -> None:
         self._path = path
+        self._psutil = psutil_module
 
     def collect(self) -> list[Snapshot]:
-        disk = psutil.disk_usage(self._path)
+        disk = self._psutil.disk_usage(self._path)
         return [
             Snapshot(
                 resource_type="disk",
@@ -62,15 +76,26 @@ class DiskCollector:
 
 
 class NetworkCollector:
-    """Collects network I/O rates (bytes/sec) rather than cumulative counters."""
+    """Collects network I/O rates (bytes/sec) rather than cumulative counters.
 
-    def __init__(self) -> None:
+    Dependencies are injectable:
+        - `psutil_module`: provides `net_io_counters()`.
+        - `time_source`: provides monotonic time for rate calculation.
+    """
+
+    def __init__(
+        self,
+        psutil_module: Any = psutil,
+        time_source: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self._psutil = psutil_module
+        self._time_source = time_source
         self._last_counters: Any | None = None
         self._last_time: float | None = None
 
     def collect(self) -> list[Snapshot]:
-        counters = psutil.net_io_counters()
-        now = time.monotonic()
+        counters = self._psutil.net_io_counters()
+        now = self._time_source()
         snapshots: list[Snapshot] = []
 
         if self._last_counters is not None and self._last_time is not None:
@@ -106,7 +131,7 @@ class NetworkCollector:
 class CompositeCollector:
     """Aggregates multiple collectors, isolating failures."""
 
-    def __init__(self, collectors: list[MetricCollector]):
+    def __init__(self, collectors: list[MetricCollector]) -> None:
         self._collectors = collectors
 
     def collect(self) -> list[Snapshot]:
