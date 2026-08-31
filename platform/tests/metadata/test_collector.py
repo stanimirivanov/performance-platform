@@ -7,14 +7,19 @@ from unittest.mock import Mock
 import pytest
 
 from perfeng.generated.environment import EnvironmentSpecification
+from perfeng.metadata.builders.config import (
+    CandidateConfig,
+    ExecutorConfig,
+    RunConfig,
+    RunMetadataBuildConfig,
+)
 from perfeng.metadata.collector import (
     MetadataCollector,
-    MetadataInput,
-    MetadataOverrides,
     collect_run_metadata,
     get_metadata_collector,
 )
 from perfeng.metadata.config import CollectorConfig
+from perfeng.metadata.config.models import ClusterConfig, KubernetesConfig, RuntimeConfig
 from perfeng.metadata.detectors import (
     ClusterInfo,
     ClusterType,
@@ -49,6 +54,7 @@ def config_no_detect():
 def fake_detectors(sample_node_info, sample_cluster_info):
     local = Mock(spec=LocalNodeDetector)
     local.detect.return_value = sample_node_info
+
     k8s = Mock(spec=KubernetesClusterDetector)
     k8s.detect.return_value = sample_cluster_info
     k8s.detect_version.return_value = "v1.28.0"
@@ -56,7 +62,24 @@ def fake_detectors(sample_node_info, sample_cluster_info):
     k8s.detect_container_runtime.return_value = "containerd"
     k8s.detect_cni.return_value = "calico"
     k8s.detect_storage_class.return_value = "standard"
+
     return local, k8s
+
+
+@pytest.fixture
+def sample_run_metadata_config():
+    return RunMetadataBuildConfig(
+        test_name="checkout-api",
+        status="running",
+        run=RunConfig(profile="smoke", trigger="ci"),
+        test=ExecutorConfig(
+            tool="k6",
+            tool_version="0.45.0",
+            test_type="api",
+            scenario="checkout-flow",
+        ),
+        candidate=CandidateConfig(git_sha="a" * 40, version="1.0.0"),
+    )
 
 
 class TestMetadataCollector:
@@ -70,10 +93,7 @@ class TestMetadataCollector:
 
     def test_collect_environment_no_autodetect(self, config_no_detect, fake_detectors):
         local, _ = fake_detectors
-        collector = MetadataCollector(
-            config=config_no_detect,
-            local_detector=local,
-        )
+        collector = MetadataCollector(config=config_no_detect, local_detector=local)
         env = collector.collect_environment()
         assert isinstance(env, EnvironmentSpecification)
         assert env.cluster == "local"
@@ -82,69 +102,55 @@ class TestMetadataCollector:
     def test_collect_environment_with_auto_detect(self, fake_detectors):
         local, k8s = fake_detectors
         config = CollectorConfig(auto_detect=True, timeout_seconds=30, fingerprint_excludes=())
-        collector = MetadataCollector(
-            config=config,
-            local_detector=local,
-            k8s_detector=k8s,
-        )
+        collector = MetadataCollector(config=config, local_detector=local, k8s_detector=k8s)
         env = collector.collect_environment()
         assert env.cluster == "test-cluster"
-
         assert env.kubernetes is not None
         assert env.kubernetes.version == "v1.28.0"
 
-    def test_collect_environment_with_overrides(self, config_no_detect, fake_detectors):
+    def test_collect_environment_with_config_override(self, config_no_detect, fake_detectors):
         local, _ = fake_detectors
         collector = MetadataCollector(config=config_no_detect, local_detector=local)
-        overrides = MetadataOverrides(
-            cluster_name="override-cluster",
-            kubernetes_version="v1.27.0",
-            node_count=5,
-            container_runtime="docker",
+
+        override_config = CollectorConfig(
+            auto_detect=False,
+            timeout_seconds=30,
+            fingerprint_excludes=(),
+            cluster=ClusterConfig(name="override-cluster", type=None),
+            kubernetes=KubernetesConfig(version="v1.27.0", node_count=5, node_pools=None),
+            runtime=RuntimeConfig(
+                container_runtime="docker",
+                cni=None,
+                storage_class=None,
+                kernel=None,
+            ),
         )
-        env = collector.collect_environment(overrides=overrides)
+        env = collector.collect_environment(config_override=override_config)
         assert env.cluster == "override-cluster"
         assert env.kubernetes is not None
         assert env.kubernetes.version == "v1.27.0"
         assert env.kubernetes.nodeCount == 5
-
         assert env.runtime is not None
         assert env.runtime.containerRuntime == "docker"
 
-    def test_collect_test_metadata(self, config_no_detect, fake_detectors):
+    def test_collect_test_metadata(
+        self,
+        config_no_detect,
+        fake_detectors,
+        sample_run_metadata_config,
+    ):
         local, _ = fake_detectors
         collector = MetadataCollector(config=config_no_detect, local_detector=local)
-        metadata_input = MetadataInput(
-            test_profile="smoke",
-            tool="k6",
-            tool_version="0.45.0",
-            scenario="checkout-flow",
-            git_sha="a" * 40,
-            version="1.0.0",
-        )
-        metadata = collector.collect_test_metadata(
-            test_name="checkout-api",
-            status="running",
-            test_metadata=metadata_input,
-        )
+
+        metadata = collector.collect_test_metadata(sample_run_metadata_config)
         assert metadata.run.suite == "checkout-api"
         assert metadata.test.tool.value == "k6"
         assert metadata.candidate.gitSha == "a" * 40
 
-    def test_collect_test_metadata_with_env_overrides(self, config_no_detect, fake_detectors):
-        local, _ = fake_detectors
-        collector = MetadataCollector(config=config_no_detect, local_detector=local)
-        metadata = collector.collect_test_metadata(
-            test_name="load-test",
-            status="created",
-            environment_overrides=MetadataOverrides(cluster_name="test-cluster"),
-        )
-        assert metadata.environment.cluster == "test-cluster"
-
-    def test_collect_run_metadata_dict(self):
-        result = collect_run_metadata(test_name="quick-test")
+    def test_collect_run_metadata_dict(self, sample_run_metadata_config):
+        result = collect_run_metadata(sample_run_metadata_config)
         assert isinstance(result, dict)
-        assert result["run"]["suite"] == "quick-test"
+        assert result["run"]["suite"] == "checkout-api"
         assert "fingerprint" in result["environment"]
 
     def test_get_metadata_collector(self):
