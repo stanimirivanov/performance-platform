@@ -1,3 +1,15 @@
-from .collector import MetadataCollector, collect_run_metadata, get_metadata_collector
+"""Performance metadata collection package."""
 
-__all__ = ["MetadataCollector", "get_metadata_collector", "collect_run_metadata"]
+from perfeng.metadata.collector import (
+    MetadataCollector,
+    MetadataOverrides,
+    collect_run_metadata,
+    get_metadata_collector,
+)
+
+__all__ = [
+    "MetadataCollector",
+    "MetadataOverrides",
+    "get_metadata_collector",
+    "collect_run_metadata",
+]
