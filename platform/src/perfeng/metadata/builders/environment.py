@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
 
 from perfeng.generated.environment import Application, EnvironmentSpecification, Kubernetes, Runtime
 from perfeng.metadata import fingerprint as fp_module
 from perfeng.metadata.builders.fingerprint import DefaultFingerprintGenerator, FingerprintGenerator
 from perfeng.metadata.detectors import KubernetesClusterDetector, LocalNodeDetector
+from perfeng.metadata.types import AnyFeatureFlags, FingerprintExcludes
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,7 +34,7 @@ class ApplicationBuildConfig:
     """Narrow application configuration for the builder."""
 
     configuration_hash: str | None = None
-    feature_flags: dict[str, Any] = field(default_factory=dict)
+    feature_flags: AnyFeatureFlags = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,7 +46,7 @@ class EnvironmentBuildConfig:
     kubernetes: KubernetesBuildConfig | None = None
     runtime: RuntimeBuildConfig | None = None
     application: ApplicationBuildConfig | None = None
-    fingerprint_excludes: tuple[str, ...] = ()
+    fingerprint_excludes: FingerprintExcludes = ()
 
 
 class EnvironmentBuilder:

@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+from perfeng.metadata.types import AnyFeatureFlags, DatabaseSize
+
 
 @dataclass(frozen=True, slots=True)
 class RunConfig:
@@ -32,7 +34,7 @@ class CandidateConfig:
     version: str | None = None
     branch: str | None = None
     configuration_hash: str | None = None
-    feature_flags: dict[str, Any] = field(default_factory=dict)
+    feature_flags: AnyFeatureFlags = field(default_factory=dict)
     tags: list[str] | None = None
     thresholds: dict[str, Any] | None = None
     database_migration_version: str | None = None
@@ -52,7 +54,7 @@ class RunRuntimeConfig:
 class DataConfig:
     dataset_id: str | None = None
     dataset_version: str | None = None
-    database_size: str | None = None
+    database_size: DatabaseSize | None = None
     seed_version: str | None = None
 
 

@@ -6,16 +6,10 @@ import os
 from pathlib import Path
 from typing import Any
 
+import dacite
 import yaml
 
-from perfeng.metadata.config.defaults import DEFAULT_CONFIG
-from perfeng.metadata.config.models import (
-    ApplicationConfig,
-    ClusterConfig,
-    CollectorConfig,
-    KubernetesConfig,
-    RuntimeConfig,
-)
+from perfeng.metadata.config.models import CollectorConfig
 
 
 class ConfigLoader:
@@ -155,60 +149,22 @@ class ConfigLoader:
 
     @staticmethod
     def _to_config(data: dict[str, Any]) -> CollectorConfig:
-        """Convert a merged dictionary into a typed CollectorConfig."""
-        config = DEFAULT_CONFIG
+        """Convert a merged dictionary into a typed CollectorConfig using dacite."""
+        # Ensure fingerprint_excludes is a tuple
+        if "fingerprint_excludes" in data:
+            if isinstance(data["fingerprint_excludes"], str):
+                data["fingerprint_excludes"] = tuple(
+                    item.strip() for item in data["fingerprint_excludes"].split(",") if item.strip()
+                )
+            elif isinstance(data["fingerprint_excludes"], list):
+                data["fingerprint_excludes"] = tuple(data["fingerprint_excludes"])
 
-        # fingerprint_excludes
-        excludes = data.get("fingerprint_excludes", ())
-        if isinstance(excludes, str):
-            excludes = tuple(item.strip() for item in excludes.split(",") if item.strip())
-        else:
-            excludes = tuple(excludes)
-
-        # sub-configs
-        cluster = None
-        if "cluster" in data:
-            cluster_data = data["cluster"]
-            cluster = ClusterConfig(
-                name=cluster_data.get("name"),
-                type=cluster_data.get("type"),
-            )
-
-        kubernetes = None
-        if "kubernetes" in data:
-            k8s_data = data["kubernetes"]
-            kubernetes = KubernetesConfig(
-                version=k8s_data.get("version"),
-                node_count=k8s_data.get("node_count"),
-                node_pools=tuple(k8s_data.get("node_pools", ())),
-            )
-
-        runtime = None
-        if "runtime" in data:
-            runtime_data = data["runtime"]
-            runtime = RuntimeConfig(
-                container_runtime=runtime_data.get("container_runtime"),
-                cni=runtime_data.get("cni"),
-                storage_class=runtime_data.get("storage_class"),
-                kernel=runtime_data.get("kernel"),
-            )
-
-        application = None
-        if "application" in data:
-            app_data = data["application"]
-            application = ApplicationConfig(
-                configuration_hash=app_data.get("configuration_hash"),
-                feature_flags=app_data.get("feature_flags", {}),
-            )
-
-        return CollectorConfig(
-            auto_detect=data.get("auto_detect", config.auto_detect),
-            timeout_seconds=data.get("timeout_seconds", config.timeout_seconds),
-            fingerprint_excludes=excludes,
-            cluster=cluster,
-            kubernetes=kubernetes,
-            runtime=runtime,
-            application=application,
+        # dacite.from_dict requires the data keys to match field names (case-sensitive)
+        # We already have the correct keys from env vars and YAML.
+        return dacite.from_dict(
+            data_class=CollectorConfig,
+            data=data,
+            config=dacite.Config(strict=True, cast=[tuple]),
         )
 
 

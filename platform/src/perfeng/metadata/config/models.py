@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from perfeng.metadata.types import FeatureFlags, FingerprintExcludes
+
 
 @dataclass(frozen=True, slots=True)
 class ClusterConfig:
@@ -37,7 +39,7 @@ class ApplicationConfig:
     """Application-level configuration."""
 
     configuration_hash: str | None = None
-    feature_flags: dict[str, bool | str | float | None] = field(default_factory=dict)
+    feature_flags: FeatureFlags = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,7 +58,7 @@ class CollectorConfig:
 
     auto_detect: bool = True
     timeout_seconds: int = 30
-    fingerprint_excludes: tuple[str, ...] = ()
+    fingerprint_excludes: FingerprintExcludes = ()
     cluster: ClusterConfig | None = None
     kubernetes: KubernetesConfig | None = None
     runtime: RuntimeConfig | None = None
