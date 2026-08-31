@@ -11,8 +11,6 @@ Usage:
            .build())
 """
 
-from typing import Any
-
 from perfeng.generated.environment import (
     Application,
     Compatibility,
@@ -23,6 +21,7 @@ from perfeng.generated.environment import (
     Runtime,
     Status,
 )
+from perfeng.metadata.types import AnyFeatureFlags
 
 
 # -----------------------------------------------------------------------------
@@ -101,13 +100,13 @@ class ApplicationBuilder:
 
     def __init__(self) -> None:
         self._configuration_hash: str | None = None
-        self._feature_flags: dict[str, Any] | None = None
+        self._feature_flags: AnyFeatureFlags | None = None
 
     def with_configuration_hash(self, hash_value: str) -> "ApplicationBuilder":
         self._configuration_hash = hash_value
         return self
 
-    def with_feature_flags(self, flags: dict[str, Any]) -> "ApplicationBuilder":
+    def with_feature_flags(self, flags: AnyFeatureFlags) -> "ApplicationBuilder":
         self._feature_flags = flags
         return self
 

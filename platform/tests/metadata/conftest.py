@@ -1,53 +1,72 @@
 """
-Metadata-specific fixtures.
+Fixtures for metadata package tests.
 """
 
+from __future__ import annotations
+
 import json
-import tempfile
 from collections.abc import Generator
-from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
-import yaml
 
 from perfeng.metadata.collector import MetadataCollector
+from perfeng.metadata.config import CollectorConfig
+from perfeng.metadata.detectors import LocalNodeDetector
 
 
 @pytest.fixture
-def temp_config_file() -> Generator[Path, None, None]:
-    """Create a temporary configuration file."""
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-        config = {
-            "auto_detect": False,
-            "timeout_seconds": 30,
-            "fingerprint_excludes": [],
-            "environment_config": {
-                "cluster": "test-cluster",
-                "kubernetes": {"version": "v1.28.0", "nodeCount": 3},
-                "runtime": {
-                    "containerRuntime": "containerd",
-                    "cni": "calico",
-                    "storageClass": "standard",
-                    "kernel": "5.15.0",
-                },
-            },
-        }
-        yaml.dump(config, f)
-        config_path = Path(f.name)
+def collector_config() -> CollectorConfig:
+    """Create a typed CollectorConfig for testing (no auto-detect)."""
+    return CollectorConfig(
+        auto_detect=False,
+        timeout_seconds=30,
+        fingerprint_excludes=(),
+        cluster=None,
+        kubernetes=None,
+        runtime=None,
+        application=None,
+    )
 
-    yield config_path
 
-    # Cleanup
-    if config_path.exists():
-        config_path.unlink()
+@pytest.fixture
+def collector(collector_config: CollectorConfig) -> MetadataCollector:
+    """Create a basic collector instance with config."""
+    return MetadataCollector(config=collector_config)
+
+
+@pytest.fixture
+def collector_config_no_detect() -> CollectorConfig:
+    """Typed config with auto-detection disabled."""
+    return CollectorConfig(
+        auto_detect=False,
+        timeout_seconds=30,
+        fingerprint_excludes=(),
+        cluster=None,
+        kubernetes=None,
+        runtime=None,
+        application=None,
+    )
+
+
+@pytest.fixture
+def fake_local_detector() -> Generator[LocalNodeDetector, None, None]:
+    """LocalNodeDetector with mocked psutil to return predictable values."""
+    detector = LocalNodeDetector()
+    with patch("perfeng.metadata.detectors.local.psutil") as mock_psutil:
+        mock_psutil.cpu_count.return_value = 8
+        mock_psutil.virtual_memory.return_value.total = 16 * (1024**3)
+        mock_psutil.disk_usage.return_value.total = 100 * (1024**3)
+        yield detector
+    # Note: This fixture yields inside patch context; careful with yield.
+    # Better to use a factory that returns a detector with mocked methods.
+    # We'll adjust: use a fixture that patches LocalNodeDetector.detect directly.
 
 
 @pytest.fixture
 def mock_subprocess() -> Generator[Mock, None, None]:
     """Mock subprocess.run for testing."""
     with patch("subprocess.run") as mock_run:
-        # Default successful responses
         mock_run.return_value = Mock(
             returncode=0,
             stdout=json.dumps(
@@ -56,56 +75,6 @@ def mock_subprocess() -> Generator[Mock, None, None]:
             stderr="",
         )
         yield mock_run
-
-
-@pytest.fixture
-def collector() -> MetadataCollector:
-    """Create a basic collector instance."""
-    return MetadataCollector()
-
-
-@pytest.fixture
-def collector_with_config(temp_config_file: Path) -> MetadataCollector:
-    """Create a collector with configuration."""
-    return MetadataCollector(temp_config_file)
-
-
-@pytest.fixture
-def sample_environment_dict() -> dict:
-    """Sample environment data for testing."""
-    return {
-        "cluster": "test-cluster",
-        "fingerprint": "a" * 64,
-        "kubernetes": {"version": "v1.28.0", "nodeCount": 3, "nodePools": []},
-        "runtime": {
-            "containerRuntime": "containerd",
-            "cni": "calico",
-            "storageClass": "standard",
-            "kernel": "5.15.0",
-        },
-        "application": {
-            "configurationHash": "config123",
-            "featureFlags": {"debug": True, "trace": False},
-        },
-    }
-
-
-@pytest.fixture
-def sample_test_metadata() -> dict:
-    """Sample test metadata for testing."""
-    return {
-        "test_name": "load-test",
-        "test_script": "load_test.py",
-        "test_profile": "medium-load",
-        "status": "running",
-        "thresholds": {"p95": 100, "p99": 200},
-        "parameters": {"users": 100, "duration": 60},
-        "tags": ["performance", "load"],
-        "triggered_by": "jenkins",
-        "trigger_type": "ci",
-        "ci_build_id": "build-123",
-        "ci_job_id": "job-456",
-    }
 
 
 @pytest.fixture

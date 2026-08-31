@@ -12,14 +12,15 @@ This directory contains examples of metadata structures used by PerfEng.
 
 These are reference JSON structures showing the expected data format.
 
-### Code Examples (`usage/`)
+### Code Examples (`platform/examples`)
 
-- `collect_metadata_demo.py` - Demonstration of the metadata collector
+- `metadata_collection_demo.py` - Demonstration of the metadata collector
 
 Run the demo:
 
 ```bash
-python examples/usage/collect_metadata_demo.py
+cd platform
+uv run python examples/metadata_collection_demo.py
 ```
 
 ## Integration Examples

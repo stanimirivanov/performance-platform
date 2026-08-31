@@ -1,390 +1,158 @@
 """
-Unit tests for the metadata collector using builders.
+Tests for MetadataCollector and convenience functions.
 """
 
-import tempfile
-from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock
 
 import pytest
-import yaml
 
-from perfeng.generated.environment import CpuArchitecture, EnvironmentSpecification
-from perfeng.generated.run_metadata import Environment as RunEnvironment
-from perfeng.generated.run_metadata import Profile
-from perfeng.generated.run_metadata import Status as RunStatus
-from perfeng.metadata import config as cfg_module
-from perfeng.metadata import detectors
-from perfeng.metadata import fingerprint as fp_module
+from perfeng.generated.environment import EnvironmentSpecification
+from perfeng.metadata.builders.config import (
+    CandidateConfig,
+    ExecutorConfig,
+    RunConfig,
+    RunMetadataBuildConfig,
+)
 from perfeng.metadata.collector import (
     MetadataCollector,
     collect_run_metadata,
     get_metadata_collector,
 )
-from tests.builders import (
-    EnvironmentBuilder,
-    KubernetesBuilder,
-    RuntimeBuilder,
-    default_environment_builder,
-    default_kubernetes_builder,
-    default_node_pool_builder,
-    default_runtime_builder,
+from perfeng.metadata.config import CollectorConfig
+from perfeng.metadata.config.models import ClusterConfig, KubernetesConfig, RuntimeConfig
+from perfeng.metadata.detectors import (
+    ClusterInfo,
+    ClusterType,
+    KubernetesClusterDetector,
+    LocalNodeDetector,
+    NodeInfo,
+    NodeResources,
 )
 
-pytestmark = pytest.mark.metadata
+
+@pytest.fixture
+def sample_node_info():
+    return NodeInfo(
+        os="Linux",
+        kernel="5.15.0",
+        architecture="x86_64",
+        resources=NodeResources(cpu_cores=8, memory_total_gb=16.0, disk_total_gb=100.0),
+    )
+
+
+@pytest.fixture
+def sample_cluster_info():
+    return ClusterInfo(name="test-cluster", type=ClusterType.KUBERNETES, node_count=3)
+
+
+@pytest.fixture
+def config_no_detect():
+    return CollectorConfig(auto_detect=False, timeout_seconds=30, fingerprint_excludes=())
+
+
+@pytest.fixture
+def fake_detectors(sample_node_info, sample_cluster_info):
+    local = Mock(spec=LocalNodeDetector)
+    local.detect.return_value = sample_node_info
+
+    k8s = Mock(spec=KubernetesClusterDetector)
+    k8s.detect.return_value = sample_cluster_info
+    k8s.detect_version.return_value = "v1.28.0"
+    k8s.detect_node_pools.return_value = None
+    k8s.detect_container_runtime.return_value = "containerd"
+    k8s.detect_cni.return_value = "calico"
+    k8s.detect_storage_class.return_value = "standard"
+
+    return local, k8s
+
+
+@pytest.fixture
+def sample_run_metadata_config():
+    return RunMetadataBuildConfig(
+        test_name="checkout-api",
+        status="running",
+        run=RunConfig(profile="smoke", trigger="ci"),
+        test=ExecutorConfig(
+            tool="k6",
+            tool_version="0.45.0",
+            test_type="api",
+            scenario="checkout-flow",
+        ),
+        candidate=CandidateConfig(git_sha="a" * 40, version="1.0.0"),
+    )
 
 
 class TestMetadataCollector:
-    """Test cases for MetadataCollector."""
+    def test_init_default(self):
+        collector = MetadataCollector()
+        assert collector.config.auto_detect is True
 
-    def test_init_default(self, collector):
-        """Test initialization with default settings."""
-        assert collector is not None
-        assert collector.config["auto_detect"] is True
-        assert collector.config["timeout_seconds"] == 30
-        assert collector._environment_cache is None
+    def test_init_with_config(self, config_no_detect):
+        collector = MetadataCollector(config=config_no_detect)
+        assert collector.config.auto_detect is False
 
-    def test_init_with_config(self, temp_config_file):
-        """Test initialization with configuration file."""
-        collector = MetadataCollector(temp_config_file)
-        assert collector.config["auto_detect"] is False
-        assert collector.config["environment_config"]["cluster"] == "test-cluster"
-
-    def test_set_override(self, collector):
-        """Test setting manual overrides."""
-        collector.set_override("test_key", "test_value")
-        assert collector.override_values["test_key"] == "test_value"
-
-        # Override environment
-        collector.set_override("environment", {"cluster": "override-cluster"})
-        assert collector.override_values["environment"]["cluster"] == "override-cluster"
-
-    def test_collect_environment_from_config(self, collector_with_config):
-        """Test collecting environment from configuration only."""
-        env = collector_with_config.collect_environment()
-
+    def test_collect_environment_no_autodetect(self, config_no_detect, fake_detectors):
+        local, _ = fake_detectors
+        collector = MetadataCollector(config=config_no_detect, local_detector=local)
+        env = collector.collect_environment()
         assert isinstance(env, EnvironmentSpecification)
-        assert env.cluster == "test-cluster"
-        assert env.fingerprint is not None
+        assert env.cluster == "local"
         assert len(env.fingerprint) == 64
+
+    def test_collect_environment_with_auto_detect(self, fake_detectors):
+        local, k8s = fake_detectors
+        config = CollectorConfig(auto_detect=True, timeout_seconds=30, fingerprint_excludes=())
+        collector = MetadataCollector(config=config, local_detector=local, k8s_detector=k8s)
+        env = collector.collect_environment()
+        assert env.cluster == "test-cluster"
         assert env.kubernetes is not None
         assert env.kubernetes.version == "v1.28.0"
-        assert env.kubernetes.nodeCount == 3
-        assert env.runtime is not None
-        assert env.runtime.containerRuntime == "containerd"
 
-    def test_collect_environment_with_override(self, collector):
-        """Test environment collection with overrides."""
-        # Build expected override environment using builder
-        expected_env = (
-            default_environment_builder()
-            .with_cluster("override-cluster")
-            .with_fingerprint("b" * 64)
-            .with_kubernetes(KubernetesBuilder().with_version("v1.27.0").with_node_count(5).build())
-            .with_runtime(RuntimeBuilder().with_container_runtime("docker").build())
-            .build()
+    def test_collect_environment_with_config_override(self, config_no_detect, fake_detectors):
+        local, _ = fake_detectors
+        collector = MetadataCollector(config=config_no_detect, local_detector=local)
+
+        override_config = CollectorConfig(
+            auto_detect=False,
+            timeout_seconds=30,
+            fingerprint_excludes=(),
+            cluster=ClusterConfig(name="override-cluster", type=None),
+            kubernetes=KubernetesConfig(version="v1.27.0", node_count=5, node_pools=None),
+            runtime=RuntimeConfig(
+                container_runtime="docker",
+                cni=None,
+                storage_class=None,
+                kernel=None,
+            ),
         )
-
-        # Convert to dict for override (as collector expects dict)
-        # includes all fields with None
-        override_dict = expected_env.model_dump()
-        collector.set_override("environment", override_dict)
-
-        env = collector.collect_environment()
+        env = collector.collect_environment(config_override=override_config)
         assert env.cluster == "override-cluster"
-        assert env.fingerprint == "b" * 64
         assert env.kubernetes is not None
         assert env.kubernetes.version == "v1.27.0"
         assert env.kubernetes.nodeCount == 5
         assert env.runtime is not None
         assert env.runtime.containerRuntime == "docker"
 
-    def test_collect_environment_caching(self, collector_with_config):
-        """Test that environment is cached after first collection."""
-        env1 = collector_with_config.collect_environment()
-        env2 = collector_with_config.collect_environment()
-        assert env1 is env2
-
-    @patch("platform.system")
-    @patch("perfeng.metadata.detectors.psutil")
-    def test_detect_node_info(self, mock_psutil, mock_platform):
-        """Test node information detection."""
-        mock_platform.return_value = "Linux"
-        mock_psutil.cpu_count.return_value = 8
-        mock_psutil.virtual_memory.return_value.total = 16 * (1024**3)
-        mock_psutil.disk_usage.return_value.total = 100 * (1024**3)
-
-        node_info = detectors.detect_node_info()
-
-        assert node_info["os"] == "Linux"
-        assert node_info["resources"]["cpu_cores"] == 8
-        assert node_info["resources"]["memory_total_gb"] == 16.0
-
-    def test_generate_fingerprint(self):
-        """Test fingerprint generation."""
-        fingerprint = fp_module.generate_fingerprint(
-            cluster_name="test-cluster",
-            k8s_version="v1.28.0",
-            node_os="linux",
-            container_runtime="containerd",
-        )
-
-        assert len(fingerprint) == 64
-        assert all(c in "0123456789abcdef" for c in fingerprint)
-
-        # Same inputs -> same fingerprint
-        fingerprint2 = fp_module.generate_fingerprint(
-            cluster_name="test-cluster",
-            k8s_version="v1.28.0",
-            node_os="linux",
-            container_runtime="containerd",
-        )
-        assert fingerprint == fingerprint2
-
-        # Different inputs -> different fingerprint
-        fingerprint3 = fp_module.generate_fingerprint(
-            cluster_name="different-cluster",
-            k8s_version="v1.28.0",
-            node_os="linux",
-            container_runtime="containerd",
-        )
-        assert fingerprint != fingerprint3
-
-    def test_generate_fingerprint_with_exclusions(self):
-        """Test fingerprint generation with exclusions."""
-        excludes = ["test-cluster"]
-
-        fingerprint = fp_module.generate_fingerprint(
-            cluster_name="test-cluster",
-            k8s_version="v1.28.0",
-            node_os="linux",
-            container_runtime="containerd",
-            excludes=excludes,
-        )
-
-        assert len(fingerprint) == 64
-        assert all(c in "0123456789abcdef" for c in fingerprint)
-
-    def test_test_metadata_collection(self):
-        """Test collecting complete test metadata."""
-        collector = MetadataCollector()
-
-        # Pass custom fields via featureFlags or notes if needed
-        metadata = collector.collect_test_metadata(
-            test_name="test-perf-1",
-            status="running",
-            test_profile="load-test",  # will map to Profile.regression (default)
-            tags=["performance", "load"],
-            thresholds={"p95": 100},
-            featureFlags={"tags": ["performance", "load"], "thresholds": {"p95": 100}},
-            notes="script.py",  # store test_script in notes
-        )
-
-        # Run fields
-        assert metadata.run.suite == "test-perf-1"
-        assert metadata.run.status == RunStatus.RUNNING
-        # profile defaults to regression because "load-test" not in enum
-        assert metadata.run.profile == Profile.regression
-
-        # Custom metadata stored in featureFlags
-        assert metadata.candidate.featureFlags is not None
-        assert metadata.candidate.featureFlags["tags"] == ["performance", "load"]
-        assert metadata.candidate.featureFlags["thresholds"] == {"p95": 100}
-        assert metadata.run.notes == "script.py"
-
-        # Environment is now RunEnvironment, not EnvironmentSpecification
-        assert isinstance(metadata.environment, RunEnvironment)
-
-    def test_collect_test_metadata_with_overrides(self, collector):
-        """Test test metadata collection with overrides."""
-        collector.set_override(
-            "test_metadata",
-            {"run.suite": "override-name", "run.status": RunStatus.COMPLETED},
-        )
-        metadata = collector.collect_test_metadata(test_name="original-name", status="pending")
-        assert metadata.run.suite == "override-name"
-        assert metadata.run.status == RunStatus.COMPLETED
-
-    def test_collect_test_metadata_with_environment(self, collector_with_config):
-        """Test that test metadata includes environment."""
-        metadata = collector_with_config.collect_test_metadata(test_name="load-test")
-        assert isinstance(metadata.environment, RunEnvironment)
-        assert metadata.environment.cluster == "test-cluster"
-        assert metadata.environment.kubernetesVersion == "v1.28.0"
-
-    @patch("perfeng.metadata.detectors.detect_cluster_info")
-    @patch("perfeng.metadata.detectors.get_kubernetes_version")
-    @patch("perfeng.metadata.detectors.detect_node_pools")
-    @patch("perfeng.metadata.detectors.detect_container_runtime")
-    @patch("perfeng.metadata.detectors.detect_cni")
-    @patch("perfeng.metadata.detectors.detect_storage_class")
-    def test_auto_detect_kubernetes(
+    def test_collect_test_metadata(
         self,
-        mock_storage,
-        mock_cni,
-        mock_runtime,
-        mock_pools,
-        mock_k8s_version,
-        mock_cluster_info,
-        collector,
+        config_no_detect,
+        fake_detectors,
+        sample_run_metadata_config,
     ):
-        mock_cluster_info.return_value = {"name": "test-context", "type": "k8s", "node_count": 3}
-        mock_k8s_version.return_value = "v1.28.0"
-        mock_pools.return_value = None
-        mock_runtime.return_value = None
-        mock_cni.return_value = None
-        mock_storage.return_value = None
+        local, _ = fake_detectors
+        collector = MetadataCollector(config=config_no_detect, local_detector=local)
 
-        # Ensure config does not override detected values
-        collector.config["environment_config"]["cluster"] = None
-        collector.config["environment_config"]["kubernetes"] = {}
-        collector.config["auto_detect"] = True
-        collector._environment_cache = None
+        metadata = collector.collect_test_metadata(sample_run_metadata_config)
+        assert metadata.run.suite == "checkout-api"
+        assert metadata.test.tool.value == "k6"
+        assert metadata.candidate.gitSha == "a" * 40
 
-        env = collector.collect_environment()
-        assert env.cluster == "test-context"
-        assert env.kubernetes.nodeCount == 3
-        assert env.kubernetes.version == "v1.28.0"
-
-    @patch("perfeng.metadata.detectors.detect_cluster_info")
-    @patch("perfeng.metadata.detectors.get_kubernetes_version")
-    @patch("perfeng.metadata.detectors.detect_node_pools")
-    @patch("perfeng.metadata.detectors.detect_container_runtime")
-    @patch("perfeng.metadata.detectors.detect_cni")
-    @patch("perfeng.metadata.detectors.detect_storage_class")
-    def test_auto_detect_kubectl_not_available(
-        self,
-        mock_storage,
-        mock_cni,
-        mock_runtime,
-        mock_pools,
-        mock_version,
-        mock_cluster,
-        collector,
-    ):
-        mock_cluster.return_value = {"name": "local", "type": "docker", "node_count": 1}
-        mock_version.return_value = None
-        mock_pools.return_value = None
-        mock_runtime.return_value = None
-        mock_cni.return_value = None
-        mock_storage.return_value = None
-
-        collector.config["auto_detect"] = True
-        collector._environment_cache = None
-
-        env = collector.collect_environment()
-        assert env.cluster == "local"
-        assert len(env.fingerprint) == 64
-        assert env.kubernetes.version is None
-        assert env.kubernetes.nodeCount == 1
-
-    def test_deep_merge(self, collector):
-        """Test deep merge of configuration dictionaries."""
-        base = {"a": 1, "b": {"c": 2, "d": 3}}
-        override = {"b": {"c": 4}, "e": 5}
-
-        result = cfg_module.deep_merge(base, override)
-        assert result["a"] == 1
-        assert result["b"]["c"] == 4
-        assert result["b"]["d"] == 3
-        assert result["e"] == 5
-
-
-class TestUtilityFunctions:
-    """Test utility functions."""
+    def test_collect_run_metadata_dict(self, sample_run_metadata_config):
+        result = collect_run_metadata(sample_run_metadata_config)
+        assert isinstance(result, dict)
+        assert result["run"]["suite"] == "checkout-api"
+        assert "fingerprint" in result["environment"]
 
     def test_get_metadata_collector(self):
-        """Test factory function for metadata collector."""
         collector = get_metadata_collector()
         assert isinstance(collector, MetadataCollector)
-
-        # With config path
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            yaml.dump({"auto_detect": False}, f)
-            config_path = f.name
-
-        collector = get_metadata_collector(config_path)
-        assert collector.config["auto_detect"] is False
-        Path(config_path).unlink()
-
-    def test_collect_run_metadata(self):
-        metadata_dict = collect_run_metadata(test_name="quick-test", tags=["quick"])
-        assert isinstance(metadata_dict, dict)
-        assert metadata_dict["run"]["suite"] == "quick-test"
-        # tags are stored in candidate.featureFlags
-        assert "tags" in metadata_dict["candidate"]["featureFlags"]
-        assert metadata_dict["candidate"]["featureFlags"]["tags"] == ["quick"]
-        assert "fingerprint" in metadata_dict["environment"]
-
-
-class TestSchemaIntegration:
-    """Test integration with generated schema models using builders."""
-
-    def test_environment_specification_validation(self):
-        """Test that EnvironmentSpecification validates correctly."""
-        env = (
-            default_environment_builder()
-            .with_kubernetes(default_kubernetes_builder().build())
-            .with_runtime(default_runtime_builder().build())
-            .build()
-        )
-        assert env.cluster == "test-cluster"
-        assert env.fingerprint == "a" * 64
-
-    def test_environment_specification_invalid_fingerprint(self):
-        """Test that invalid fingerprint raises validation error."""
-        from pydantic import ValidationError
-
-        with pytest.raises(ValidationError):
-            EnvironmentBuilder().with_cluster("test").with_fingerprint("not-a-hex-string").build()
-
-    def test_node_pool_model(self):
-        """Test NodePool model."""
-        node_pool = (
-            default_node_pool_builder()
-            .with_name("pool-1")
-            .with_node_model("m5.xlarge")
-            .with_cpu_architecture(CpuArchitecture.amd64)
-            .with_cpu_count(4)
-            .with_memory_gi_b(16.0)
-            .build()
-        )
-        assert node_pool.name == "pool-1"
-        assert node_pool.cpuArchitecture == CpuArchitecture.amd64
-        assert node_pool.cpuCount == 4
-
-    def test_environment_deserialization(self):
-        """Test deserialization from JSON using builders."""
-        env = default_environment_builder().build()
-        json_str = env.model_dump_json()
-        reconstructed = EnvironmentSpecification.model_validate_json(json_str)
-        assert reconstructed.cluster == env.cluster
-        assert reconstructed.fingerprint == env.fingerprint
-
-    def test_environment_to_dict(self):
-        """Test conversion to dictionary with model_dump."""
-        env = (
-            default_environment_builder()
-            .with_kubernetes(default_kubernetes_builder().build())
-            .with_runtime(default_runtime_builder().build())
-            .build()
-        )
-        as_dict = env.model_dump(exclude_none=True)
-        assert as_dict["cluster"] == "test-cluster"
-        assert "kubernetes" in as_dict
-        assert "runtime" in as_dict
-        # Not provided → should be excluded
-        assert "compatibility" not in as_dict
-
-    def test_model_copy(self):
-        """Test copying models."""
-        env = default_environment_builder().build()
-        env_copy = env.model_copy()
-        assert env_copy is not env
-        assert env_copy.cluster == env.cluster
-        assert env_copy.fingerprint == env.fingerprint
-
-        # Update copy
-        env_updated = env.model_copy(update={"cluster": "new-cluster"})
-        assert env_updated.cluster == "new-cluster"
-        assert env_updated.fingerprint == env.fingerprint

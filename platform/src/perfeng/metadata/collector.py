@@ -1,118 +1,74 @@
-"""Main metadata collector orchestrator."""
+"""Metadata collector facade."""
 
-from pathlib import Path
+from __future__ import annotations
+
 from typing import Any
 
 from perfeng.generated.environment import EnvironmentSpecification
 from perfeng.generated.run_metadata import PerformanceRunMetadata
-
-from . import builders
-from . import config as cfg
+from perfeng.metadata.builders import EnvironmentBuilder, RunMetadataBuilder
+from perfeng.metadata.builders.config import RunMetadataBuildConfig
+from perfeng.metadata.config import CollectorConfig, load_collector_config
+from perfeng.metadata.detectors import KubernetesClusterDetector, LocalNodeDetector
+from perfeng.metadata.environment_collector import EnvironmentCollector
+from perfeng.metadata.run_metadata_collector import RunMetadataCollector
 
 
 class MetadataCollector:
-    """
-    Collects metadata about the test runner environment using the
-    Environment Specification schema.
-
-    The collector detects the environment where the test runner is executing
-    and creates a validated EnvironmentSpecification object.
-    """
+    """Facade that delegates to environment and run metadata collectors."""
 
     def __init__(
         self,
-        config_path: str | Path | None = None,
-        config_dict: dict[str, Any] | None = None,
+        config: CollectorConfig | None = None,
+        local_detector: LocalNodeDetector | None = None,
+        k8s_detector: KubernetesClusterDetector | None = None,
+        env_builder: EnvironmentBuilder | None = None,
+        run_builder: RunMetadataBuilder | None = None,
     ) -> None:
-        """
-        Initialize the collector.
-
-        Args:
-            config_path: Path to a YAML configuration file.
-            config_dict: In-memory configuration dictionary.
-        """
-        if config_dict is not None:
-            self.config = config_dict
-        else:
-            self.config = cfg.load_config(config_path)
-        self.override_values: dict[str, Any] = {}
-        self._environment_cache: EnvironmentSpecification | None = None
-
-    def set_override(self, key: str, value: Any) -> None:
-        """
-        Set a manual override for a metadata value.
-
-        Args:
-            key: Override key (e.g., "environment", "test_metadata").
-            value: Override value.
-        """
-        self.override_values[key] = value
-
-    def collect_environment(self) -> EnvironmentSpecification:
-        """
-        Collect environment information and return as validated schema.
-
-        Priority:
-        1. Manual overrides
-        2. Environment variables (PERFENG_*)
-        3. Configuration file
-        4. Auto-detection (if enabled)
-        """
-        if "environment" in self.override_values:
-            env_data = self.override_values["environment"]
-            return EnvironmentSpecification(**env_data)
-
-        if self._environment_cache:
-            return self._environment_cache
-
-        env_spec = builders.build_environment_spec(
-            self.config,
-            auto_detect=self.config.get("auto_detect", True),
+        self._config = config or load_collector_config()
+        self._env_collector = EnvironmentCollector(
+            config=self._config,
+            local_detector=local_detector,
+            k8s_detector=k8s_detector,
+            builder=env_builder,
         )
-        self._environment_cache = env_spec
-        return env_spec
+        self._run_collector = RunMetadataCollector(builder=run_builder)
+
+    @property
+    def config(self) -> CollectorConfig:
+        return self._config
+
+    def collect_environment(
+        self, config_override: CollectorConfig | None = None
+    ) -> EnvironmentSpecification:
+        """Collect environment information using the given config.
+
+        Args:
+            config_override: Optional CollectorConfig to use instead of the
+                one stored in the collector. If provided, the result is not
+                cached.
+
+        Returns:
+            EnvironmentSpecification built from config and live detectors.
+        """
+        return self._env_collector.collect(overrides=config_override)
 
     def collect_test_metadata(
         self,
-        test_name: str,
-        status: str = "CREATED",
-        **kwargs,
+        run_metadata_config: RunMetadataBuildConfig,
+        env_config_override: CollectorConfig | None = None,
     ) -> PerformanceRunMetadata:
-        """
-        Collect complete test metadata and return a PerformanceRunMetadata instance.
+        """Collect full test metadata using a RunMetadataBuildConfig.
 
         Args:
-            test_name: Name of the test (used as suite and scenario).
-            status: Initial status string (mapped to RunStatus enum).
-            **kwargs: Additional parameters to populate nested models.
-                Common keys: test_profile, trigger_type, tool, toolVersion,
-                scenario, gitSha, version, branch, replicas, cpuRequests, etc.
+            run_metadata_config: Fully specified run metadata configuration.
+            env_config_override: Optional environment config override.
 
         Returns:
-            A fully populated PerformanceRunMetadata instance.
+            PerformanceRunMetadata built from the config and collected environment.
         """
-        env_spec = self.collect_environment()
-        metadata = builders.build_performance_run_metadata(
-            test_name,
-            status,
-            env_spec,
-            kwargs,
-        )
-
-        # Apply overrides (support dotted notation)
-        if "test_metadata" in self.override_values:
-            override = self.override_values["test_metadata"]
-            for key, value in override.items():
-                parts = key.split(".")
-                obj = metadata
-                for part in parts[:-1]:
-                    obj = getattr(obj, part, None)
-                    if obj is None:
-                        break
-                else:
-                    setattr(obj, parts[-1], value)
-
-        return metadata
+        env_spec = self.collect_environment(config_override=env_config_override)
+        return self._run_collector.collect(env_spec, run_metadata_config)
 
 
 # -----------------------------------------------------------------------------
@@ -120,24 +76,24 @@ class MetadataCollector:
 # -----------------------------------------------------------------------------
 
 
-def get_metadata_collector(
-    config_path: str | Path | None = None,
-) -> MetadataCollector:
-    """Factory function for metadata collector."""
-    return MetadataCollector(config_path)
+def get_metadata_collector(env_type: str | None = None) -> MetadataCollector:
+    """Factory function that returns a MetadataCollector with config loaded."""
+    config = load_collector_config(env_type)
+    return MetadataCollector(config=config)
 
 
-def collect_run_metadata(test_name: str, **kwargs) -> dict[str, Any]:
+def collect_run_metadata(
+    run_metadata_config: RunMetadataBuildConfig,
+    env_type: str | None = None,
+    env_config_override: CollectorConfig | None = None,
+) -> dict[str, Any]:
+    """Collect run metadata using a full RunMetadataBuildConfig.
+
+    Returns a dictionary representation of the metadata.
     """
-    Convenience function to collect run metadata and return as a dict.
-
-    Args:
-        test_name: Name of the test.
-        **kwargs: Additional parameters passed to collect_test_metadata.
-
-    Returns:
-        Dictionary representation of the run metadata.
-    """
-    collector = MetadataCollector()
-    metadata = collector.collect_test_metadata(test_name, **kwargs)
-    return metadata.model_dump(exclude_none=True)
+    collector = get_metadata_collector(env_type)
+    metadata = collector.collect_test_metadata(
+        run_metadata_config=run_metadata_config,
+        env_config_override=env_config_override,
+    )
+    return metadata.model_dump(mode="json", exclude_none=True)
