@@ -21,7 +21,7 @@ class FingerprintGenerator(Protocol):
 
 
 class DefaultFingerprintGenerator:
-    """Thin wrapper around a provided fingerprint function."""
+    """Wrapper around a provided fingerprint function."""
 
     def __init__(self, generate_fn: Callable[..., str]) -> None:
         self._generate = generate_fn
