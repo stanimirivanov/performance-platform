@@ -17,6 +17,12 @@ class MetadataPersistenceClient:
         self.base_url = base_url.rstrip("/")
         self._client = client or httpx.AsyncClient()
 
+    async def __aenter__(self) -> MetadataPersistenceClient:
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        await self.close()
+
     async def close(self) -> None:
         await self._client.aclose()
 
@@ -82,7 +88,7 @@ class MetadataPersistenceClient:
 
         return EnvironmentCreate(
             cluster_name=env.cluster,
-            cluster_type=None,  # not present in high-level model
+            cluster_type=None,
             kubernetes_version=env.kubernetesVersion,
             cloud_provider=None,
             cloud_region=env.region,
