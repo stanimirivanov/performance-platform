@@ -30,8 +30,11 @@ from tests.builders import (
 
 @pytest.fixture
 def collector() -> MetadataCollector:
-    """Return a basic metadata collector instance."""
-    return MetadataCollector()
+    """Return a collector with auto_detect disabled for testing."""
+    from perfeng.metadata.config import CollectorConfig
+
+    config = CollectorConfig(auto_detect=False)
+    return MetadataCollector(config=config)
 
 
 # Mark the entire module as metadata tests

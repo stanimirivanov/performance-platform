@@ -18,10 +18,13 @@ from perfeng.metadata.builders.config import (
 )
 from perfeng.metadata.builders.environment import EnvironmentBuilder
 from perfeng.metadata.builders.run_metadata import RunMetadataBuilder
-from perfeng.metadata.config.models import ApplicationConfig as CollectorAppConfig
-from perfeng.metadata.config.models import CollectorConfig
-from perfeng.metadata.config.models import KubernetesConfig as CollectorK8sConfig
-from perfeng.metadata.config.models import RuntimeConfig as CollectorRuntimeConfig
+from perfeng.metadata.config import (
+    ApplicationConfig,
+    ClusterConfig,
+    CollectorConfig,
+    KubernetesConfig,
+    RuntimeConfig,
+)
 
 
 def build_environment_spec(
@@ -29,8 +32,6 @@ def build_environment_spec(
     auto_detect: bool = True,
 ) -> EnvironmentSpecification:
     """Legacy entry-point: builds an EnvironmentSpecification from a raw dict."""
-    # Convert raw dict to CollectorConfig
-    # We'll replicate the parsing from the old config loader.
     env_raw = config.get("environment_config", {})
     k8s_raw = env_raw.get("kubernetes", {})
     rt_raw = env_raw.get("runtime", {})
@@ -40,22 +41,18 @@ def build_environment_spec(
         auto_detect=auto_detect,
         timeout_seconds=config.get("timeout_seconds", 30),
         fingerprint_excludes=tuple(config.get("fingerprint_excludes", [])),
-        cluster=type(
-            "ClusterConfig",
-            (),
-            {
-                "name": env_raw.get("cluster"),
-                "type": None,
-            },
-        )(),
-        kubernetes=CollectorK8sConfig(
+        cluster=ClusterConfig(
+            name=env_raw.get("cluster"),
+            type=None,
+        ),
+        kubernetes=KubernetesConfig(
             node_count=k8s_raw.get("nodeCount"),
             version=k8s_raw.get("version"),
             node_pools=tuple(k8s_raw.get("nodePools", [])) if k8s_raw.get("nodePools") else None,
         )
         if k8s_raw
         else None,
-        runtime=CollectorRuntimeConfig(
+        runtime=RuntimeConfig(
             container_runtime=rt_raw.get("containerRuntime"),
             cni=rt_raw.get("cni"),
             storage_class=rt_raw.get("storageClass"),
@@ -63,7 +60,7 @@ def build_environment_spec(
         )
         if rt_raw
         else None,
-        application=CollectorAppConfig(
+        application=ApplicationConfig(
             configuration_hash=app_raw.get("configurationHash"),
             feature_flags=app_raw.get("featureFlags", {}),
         )

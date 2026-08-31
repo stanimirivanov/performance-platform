@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Generic, TypeVar
 
-from perfeng.generated.run_metadata import Profile, RunStatus, TestTool, TestType, Trigger
+from perfeng.generated.run_metadata import Profile, Status, Tool, Trigger, Type
 
 E = TypeVar("E")
 
@@ -20,24 +20,24 @@ class EnumMapper(Generic[E]):
         return self._mapping.get(value.lower(), self._default)
 
 
-STATUS_MAPPER = EnumMapper[RunStatus](
+STATUS_MAPPER = EnumMapper[Status](
     {
-        "created": RunStatus.CREATED,
-        "validating": RunStatus.VALIDATING,
-        "provisioning": RunStatus.PROVISIONING,
-        "warming_up": RunStatus.WARMING_UP,
-        "running": RunStatus.RUNNING,
-        "collecting": RunStatus.COLLECTING,
-        "analyzing": RunStatus.ANALYZING,
-        "reporting": RunStatus.REPORTING,
-        "completed": RunStatus.COMPLETED,
-        "invalid": RunStatus.INVALID,
-        "aborted": RunStatus.ABORTED,
-        "infrastructure_failure": RunStatus.INFRASTRUCTURE_FAILURE,
-        "test_failure": RunStatus.TEST_FAILURE,
-        "inconclusive": RunStatus.INCONCLUSIVE,
+        "created": Status.CREATED,
+        "validating": Status.VALIDATING,
+        "provisioning": Status.PROVISIONING,
+        "warming_up": Status.WARMING_UP,
+        "running": Status.RUNNING,
+        "collecting": Status.COLLECTING,
+        "analyzing": Status.ANALYZING,
+        "reporting": Status.REPORTING,
+        "completed": Status.COMPLETED,
+        "invalid": Status.INVALID,
+        "aborted": Status.ABORTED,
+        "infrastructure_failure": Status.INFRASTRUCTURE_FAILURE,
+        "test_failure": Status.TEST_FAILURE,
+        "inconclusive": Status.INCONCLUSIVE,
     },
-    RunStatus.CREATED,
+    Status.CREATED,
 )
 
 PROFILE_MAPPER = EnumMapper[Profile](
@@ -63,22 +63,22 @@ TRIGGER_MAPPER = EnumMapper[Trigger](
     Trigger.manual,
 )
 
-TOOL_MAPPER = EnumMapper[TestTool](
+TOOL_MAPPER = EnumMapper[Tool](
     {
-        "k6": TestTool.k6,
-        "playwright": TestTool.playwright,
-        "kube-burner": TestTool.kube_burner,
-        "benchmark-operator": TestTool.benchmark_operator,
+        "k6": Tool.k6,
+        "playwright": Tool.playwright,
+        "kube-burner": Tool.kube_burner,
+        "benchmark-operator": Tool.benchmark_operator,
     },
-    TestTool.k6,
+    Tool.k6,
 )
 
-TYPE_MAPPER = EnumMapper[TestType](
+TYPE_MAPPER = EnumMapper[Type](
     {
-        "api": TestType.api,
-        "browser": TestType.browser,
-        "kubernetes": TestType.kubernetes,
-        "infrastructure": TestType.infrastructure,
+        "api": Type.api,
+        "browser": Type.browser,
+        "kubernetes": Type.kubernetes,
+        "infrastructure": Type.infrastructure,
     },
-    TestType.api,
+    Type.api,
 )

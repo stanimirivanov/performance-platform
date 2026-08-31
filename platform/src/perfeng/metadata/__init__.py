@@ -2,8 +2,8 @@
 
 from perfeng.metadata.collector import (
     MetadataCollector,
+    MetadataInput,
     MetadataOverrides,
-    TestMetadata,
     collect_run_metadata,
     get_metadata_collector,
 )
@@ -11,7 +11,7 @@ from perfeng.metadata.collector import (
 __all__ = [
     "MetadataCollector",
     "MetadataOverrides",
-    "TestMetadata",
+    "MetadataInput",
     "get_metadata_collector",
     "collect_run_metadata",
 ]

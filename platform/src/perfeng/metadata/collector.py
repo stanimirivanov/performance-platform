@@ -18,12 +18,18 @@ from perfeng.metadata.builders.config import (
     RunRuntimeConfig,
     TestConfig,
 )
-from perfeng.metadata.config import CollectorConfig, load_collector_config
+from perfeng.metadata.config import (
+    ClusterConfig,
+    CollectorConfig,
+    KubernetesConfig,
+    RuntimeConfig,
+    load_collector_config,
+)
 from perfeng.metadata.detectors import KubernetesClusterDetector, LocalNodeDetector
 
 
 @dataclass(frozen=True, slots=True)
-class TestMetadata:
+class MetadataInput:
     """Convenience structure for test parameters (backward compatible)."""
 
     test_profile: str = "regression"
@@ -119,58 +125,73 @@ class MetadataCollector:
         """Return a new CollectorConfig with overrides applied."""
         if overrides is None:
             return self._config
-        # We need to construct a new config. Since CollectorConfig is frozen,
-        # we use dataclasses.replace or build manually.
-        import dataclasses
 
-        new_config = dataclasses.replace(
-            self._config,
-            cluster=self._config.cluster,
-            kubernetes=self._config.kubernetes,
-            runtime=self._config.runtime,
-            application=self._config.application,
-        )
-        # Apply overrides to relevant sub-configs.
-        # For simplicity, we create new sub-config objects.
-        if overrides.cluster_name or overrides.cluster_type:
-            cluster = new_config.cluster or type(new_config.cluster)(name="", type="")
-            cluster = dataclasses.replace(
-                cluster,
-                name=overrides.cluster_name or cluster.name,
-                type=overrides.cluster_type or cluster.type,
+        # Start with current values
+        cluster = self._config.cluster
+        kubernetes = self._config.kubernetes
+        runtime = self._config.runtime
+
+        # Apply cluster overrides
+        if overrides.cluster_name is not None or overrides.cluster_type is not None:
+            cluster = ClusterConfig(
+                name=overrides.cluster_name
+                if overrides.cluster_name is not None
+                else (cluster.name if cluster else None),
+                type=overrides.cluster_type
+                if overrides.cluster_type is not None
+                else (cluster.type if cluster else None),
             )
-            new_config = dataclasses.replace(new_config, cluster=cluster)
+        else:
+            cluster = cluster  # keep existing
 
+        # Apply kubernetes overrides
         if overrides.node_count is not None or overrides.kubernetes_version is not None:
-            k8s = new_config.kubernetes or type(new_config.kubernetes)()
-            k8s = dataclasses.replace(
-                k8s,
-                node_count=overrides.node_count
-                if overrides.node_count is not None
-                else k8s.node_count,
+            kubernetes = KubernetesConfig(
                 version=overrides.kubernetes_version
                 if overrides.kubernetes_version is not None
-                else k8s.version,
+                else (kubernetes.version if kubernetes else None),
+                node_count=overrides.node_count
+                if overrides.node_count is not None
+                else (kubernetes.node_count if kubernetes else None),
+                node_pools=kubernetes.node_pools if kubernetes else None,
             )
-            new_config = dataclasses.replace(new_config, kubernetes=k8s)
+        else:
+            kubernetes = kubernetes  # keep existing
 
+        # Apply runtime overrides
         if (
             overrides.container_runtime is not None
             or overrides.cni is not None
             or overrides.storage_class is not None
             or overrides.kernel is not None
         ):
-            runtime = new_config.runtime or type(new_config.runtime)()
-            runtime = dataclasses.replace(
-                runtime,
-                container_runtime=overrides.container_runtime or runtime.container_runtime,
-                cni=overrides.cni or runtime.cni,
-                storage_class=overrides.storage_class or runtime.storage_class,
-                kernel=overrides.kernel or runtime.kernel,
+            runtime = RuntimeConfig(
+                container_runtime=overrides.container_runtime
+                if overrides.container_runtime is not None
+                else (runtime.container_runtime if runtime else None),
+                cni=overrides.cni
+                if overrides.cni is not None
+                else (runtime.cni if runtime else None),
+                storage_class=overrides.storage_class
+                if overrides.storage_class is not None
+                else (runtime.storage_class if runtime else None),
+                kernel=overrides.kernel
+                if overrides.kernel is not None
+                else (runtime.kernel if runtime else None),
             )
-            new_config = dataclasses.replace(new_config, runtime=runtime)
+        else:
+            runtime = runtime  # keep existing
 
-        return new_config
+        # Build new config
+        return CollectorConfig(
+            auto_detect=self._config.auto_detect,
+            timeout_seconds=self._config.timeout_seconds,
+            fingerprint_excludes=self._config.fingerprint_excludes,
+            cluster=cluster,
+            kubernetes=kubernetes,
+            runtime=runtime,
+            application=self._config.application,
+        )
 
     def collect_environment(
         self,
@@ -198,13 +219,13 @@ class MetadataCollector:
         self,
         test_name: str,
         status: str = "CREATED",
-        test_metadata: TestMetadata | None = None,
+        test_metadata: MetadataInput | None = None,
         environment_overrides: MetadataOverrides | None = None,
     ) -> PerformanceRunMetadata:
         """Collect full test metadata and return the Pydantic model."""
         env_spec = self.collect_environment(overrides=environment_overrides)
 
-        meta = test_metadata or TestMetadata()
+        meta = test_metadata or MetadataInput()
         run_meta_config = self._to_run_metadata_config(test_name, status, meta)
 
         builder = RunMetadataBuilder(run_meta_config)
@@ -214,7 +235,7 @@ class MetadataCollector:
     def _to_run_metadata_config(
         test_name: str,
         status: str,
-        meta: TestMetadata,
+        meta: MetadataInput,
     ) -> RunMetadataBuildConfig:
         """Convert TestMetadata to RunMetadataBuildConfig."""
         return RunMetadataBuildConfig(
@@ -322,7 +343,7 @@ def get_metadata_collector(env_type: str | None = None) -> MetadataCollector:
 def collect_run_metadata(
     test_name: str,
     status: str = "CREATED",
-    test_metadata: TestMetadata | None = None,
+    test_metadata: MetadataInput | None = None,
     env_type: str | None = None,
     environment_overrides: MetadataOverrides | None = None,
 ) -> dict[str, Any]:
