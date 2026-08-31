@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import fields
 from datetime import UTC, datetime
 
-from perfeng.generated.environment import EnvironmentSpecification
+from perfeng.generated.environment import EnvironmentSpecification, Kubernetes, NodePool
 from perfeng.generated.run_metadata import (
     Candidate,
     Data,
@@ -127,13 +126,18 @@ class RunMetadataBuilder:
 
     @staticmethod
     def _has_any_field(dataclass_instance) -> bool:
+        from dataclasses import fields
+
         return any(
             getattr(dataclass_instance, f.name) is not None for f in fields(dataclass_instance)
         )
 
 
 class EnvironmentConverter:
-    """Converts EnvironmentSpecification into the run-metadata Environment model."""
+    """Converts EnvironmentSpecification into the run-metadata Environment model.
+
+    Encapsulates deep traversal using helper methods, avoiding Law of Demeter violations.
+    """
 
     @classmethod
     def convert(
@@ -144,17 +148,9 @@ class EnvironmentConverter:
         kubernetes = env_spec.kubernetes
         runtime = env_spec.runtime
 
-        first_pool = None
-        if kubernetes and kubernetes.nodePools and len(kubernetes.nodePools) > 0:
-            first_pool = kubernetes.nodePools[0]
-
-        node_pool = overrides.node_pool
-        if node_pool is None and first_pool is not None:
-            node_pool = first_pool.name
-
-        cpu_arch = overrides.cpu_architecture
-        if cpu_arch is None and first_pool is not None and first_pool.cpuArchitecture:
-            cpu_arch = first_pool.cpuArchitecture.value
+        primary_pool = cls._primary_pool(kubernetes)
+        node_pool = overrides.node_pool or (primary_pool.name if primary_pool else None)
+        cpu_arch = overrides.cpu_architecture or cls._cpu_arch(primary_pool)
 
         k8s_version = kubernetes.version if kubernetes and kubernetes.version else "0.0.0"
 
@@ -172,3 +168,13 @@ class EnvironmentConverter:
             nodeCount=kubernetes.nodeCount if kubernetes else None,
             region=overrides.region,
         )
+
+    @staticmethod
+    def _primary_pool(k8s: Kubernetes | None) -> NodePool | None:
+        """Return the first node pool, if any."""
+        return k8s.nodePools[0] if k8s and k8s.nodePools else None
+
+    @staticmethod
+    def _cpu_arch(pool: NodePool | None) -> str | None:
+        """Extract the CPU architecture from a node pool, safely."""
+        return pool.cpuArchitecture.value if pool and pool.cpuArchitecture else None
