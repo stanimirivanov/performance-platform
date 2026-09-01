@@ -24,6 +24,9 @@ uv run uvicorn perfeng.api.main:app --reload --port 8000
 
 # Use CLI
 uv run perfeng --help
+
+# Clear cache
+uv cache clean
 ```
 
 ## Testing
@@ -82,6 +85,10 @@ uv run pytest tests/ --cov=perfeng --cov-report=html --cov-report=term
 
 # Metadata only with coverage
 uv run pytest tests/metadata/ --cov=perfeng.metadata --cov-report=term
+
+
+# Clear test cache
+uv run pytest --cache-clear
 ```
 
 **Test Coverage Requirements**

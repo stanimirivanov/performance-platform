@@ -63,21 +63,26 @@ select = ["E", "F", "I", "N", "UP", "B", "SIM"]
 ignore = ["E501"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = [
+    "tests/unit",
+    "tests/component",
+    "tests/integration",
+    "tests/contract",
+    "tests/e2e",
+]
 pythonpath = ["src"]
 addopts = "-ra -q --cov=perfeng --cov-report=term-missing --cov-report=html"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 asyncio_default_test_loop_scope = "session"
 markers = [
-    "metadata: Metadata collection tests",
-    "normalization: Data normalization tests",
-    "core: Core functionality tests",
-    "integration: Integration tests (requires external dependencies)",
-    "unit: Unit tests (fast, no external dependencies)",
-    "slow: Slow running tests",
-    "requires_kubectl: Tests that require kubectl",
-    "requires_psutil: Tests that require psutil",
+    "unit: fast tests with mocked dependencies",
+    "component: subsystem tests with internal components and mocked external systems",
+    "integration: tests requiring real external services (database, HTTP)",
+    "contract: API contract/schema tests",
+    "e2e: end-to-end workflow tests",
+    "smoke: minimal set of basic checks",
+    "regression: tests for fixed bugs",
 ]
 
 [tool.coverage.run]
