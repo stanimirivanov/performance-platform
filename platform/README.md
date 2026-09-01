@@ -1,4 +1,4 @@
-# PerfEng Platform
+.venv/Scripts/python.exe -m uvicorn perfeng.api.run:app --reload --port 8000# PerfEng Platform
 
 Core orchestration and analysis platform for continuous performance engineering.
 
@@ -18,7 +18,9 @@ uv run ruff check .
 uv run mypy .
 
 # Start API server
-uv run uvicorn perfeng.api.main:app --reload
+uv run uvicorn perfeng.api.main:app --reload --port 8000
+# or
+.venv/Scripts/python.exe -m uvicorn perfeng.api.run:app --reload --port 8000
 
 # Use CLI
 uv run perfeng --help
