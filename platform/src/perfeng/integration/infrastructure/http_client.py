@@ -87,5 +87,9 @@ class ResilientHttpClient:
 
         raise RuntimeError("Retry loop exited unexpectedly")
 
-    async def close(self) -> None:
-        await self._client.aclose()
+    async def __aenter__(self) -> ResilientHttpClient:
+        return self
+
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        if self._owns_client:
+            await self._client.aclose()

@@ -41,7 +41,7 @@ class StorageRunRepository:
         return result
 
     async def close(self) -> None:
-        await self._client.close()
+        await self._client.__aexit__(None, None, None)
 
 
 class StorageSnapshotRepository:
@@ -69,4 +69,4 @@ class StorageSnapshotRepository:
         self._logger.debug("Posted %d snapshots for run %s", len(snapshots), run_id)
 
     async def close(self) -> None:
-        await self._client.close()
+        await self._client.__aexit__(None, None, None)

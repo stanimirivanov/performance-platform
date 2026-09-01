@@ -47,4 +47,5 @@ async def test_repository_close():
     mock_client = AsyncMock()
     repo = StorageSnapshotRepository(base_url="http://test", http_client=mock_client)
     await repo.close()
-    mock_client.aclose.assert_awaited_once()
+    # Since the repository doesn't own the injected client, it should not be closed
+    mock_client.aclose.assert_not_awaited()

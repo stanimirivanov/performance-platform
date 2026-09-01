@@ -11,19 +11,27 @@ from perfeng.storage.schemas import EnvironmentCreate, RunCreate
 
 @runtime_checkable
 class HttpClient(Protocol):
-    """Async HTTP client abstraction."""
+    """Async HTTP client abstraction.
+
+    Implementations must support use as an async context manager,
+    which is the standard lifecycle pattern for async resources.
+    """
 
     async def post(
         self,
         url: str,
         json: dict[str, Any],
         timeout: float | None = None,
-    ) -> Any:  # <-- now Any; concrete impls return httpx.Response
+    ) -> Any:
         """POST JSON payload and return the raw response object."""
         ...
 
-    async def close(self) -> None:
-        """Release underlying connections."""
+    async def __aenter__(self) -> HttpClient:
+        """Enter the async context manager."""
+        ...
+
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Exit the async context manager, releasing resources."""
         ...
 
 

@@ -1,7 +1,7 @@
 """Unit tests for MetadataPersistenceClient."""
 
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from uuid import uuid4
 
 import pytest
@@ -113,8 +113,22 @@ async def test_save_posts_correct_payload():
 
 
 @pytest.mark.asyncio
-async def test_close_calls_aclose():
+async def test_close_with_injected_client_does_not_close_it():
     mock_client = AsyncMock()
     client = MetadataPersistenceClient(base_url="http://test", client=mock_client)
     await client.close()
-    mock_client.aclose.assert_awaited_once()
+    # Injected client should not be closed by the facade
+    mock_client.aclose.assert_not_awaited()
+    mock_client.close.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_close_without_injected_client_closes_internal_repository():
+    with patch("perfeng.integration.persistence.StorageRunRepository") as repo_cls:
+        repo = Mock()
+        repo.close = AsyncMock()
+        repo_cls.return_value = repo
+
+        client = MetadataPersistenceClient(base_url="http://test")
+        await client.close()
+        repo.close.assert_awaited_once()
