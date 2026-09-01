@@ -1,0 +1,60 @@
+"""Robust interval scheduler."""
+
+from __future__ import annotations
+
+import asyncio
+import contextlib
+import logging
+from collections.abc import Awaitable, Callable
+
+
+class IntervalScheduler:
+    """Robust interval scheduler with graceful stop and error isolation."""
+
+    def __init__(
+        self,
+        interval_seconds: float,
+        callback: Callable[[], Awaitable[None]],
+        name: str = "scheduler",
+    ):
+        if interval_seconds <= 0:
+            raise ValueError("interval_seconds must be positive")
+        self._interval = interval_seconds
+        self._callback = callback
+        self._name = name
+        self._stop_event = asyncio.Event()
+        self._task: asyncio.Task | None = None
+        self._logger = logging.getLogger(f"{__name__}.{name}")
+
+    async def start(self) -> None:
+        if self._task is not None and not self._task.done():
+            raise RuntimeError(f"Scheduler '{self._name}' is already running")
+        self._stop_event.clear()
+        self._task = asyncio.create_task(self._run(), name=f"scheduler-{self._name}")
+
+    async def stop(self) -> None:
+        if self._task is None or self._task.done():
+            return
+        self._stop_event.set()
+        try:
+            await asyncio.wait_for(self._task, timeout=self._interval + 5.0)
+        except TimeoutError:
+            self._logger.warning("Scheduler task did not stop gracefully, cancelling")
+            self._task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._task
+        self._task = None
+
+    async def _run(self) -> None:
+        self._logger.info("Scheduler '%s' started (interval=%.2fs)", self._name, self._interval)
+        while not self._stop_event.is_set():
+            try:
+                await self._callback()
+            except Exception:
+                self._logger.exception("Unhandled error in scheduled callback '%s'", self._name)
+
+            try:
+                await asyncio.wait_for(self._stop_event.wait(), timeout=self._interval)
+            except TimeoutError:
+                pass  # Normal interval expiration
+        self._logger.info("Scheduler '%s' stopped", self._name)
