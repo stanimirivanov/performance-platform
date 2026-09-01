@@ -106,7 +106,7 @@ class TestResilientHttpClient:
         client = ResilientHttpClient(base_url="http://test", client=mock_client)
         await client.close()
         mock_client.aclose.assert_awaited_once()
-        mock_client.close.assert_not_awaited()  # optional, ensure close not called
+        mock_client.close.assert_not_awaited()
 
 
 class TestIntervalScheduler:
