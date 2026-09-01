@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from perfeng.generated.environment import CpuArchitecture, EnvironmentSpecification, Status
 from perfeng.metadata.collector import MetadataCollector
-from tests.builders import (
+from tests.helpers.builders.builders_legacy import (
     ApplicationBuilder,
     CompatibilityBuilder,
     EnvironmentBuilder,
@@ -35,10 +35,6 @@ def collector() -> MetadataCollector:
 
     config = CollectorConfig(auto_detect=False)
     return MetadataCollector(config=config)
-
-
-# Mark the entire module as metadata tests
-pytestmark = pytest.mark.metadata
 
 
 # -----------------------------------------------------------------------------

@@ -51,6 +51,13 @@ clean: ## Clean build artifacts
 	rm -rf artifacts/
 	@echo "Clean complete!"
 
+clean-pycache: ## Clean "__pycache__" directories
+	Get-ChildItem -Path . -Directory -Recurse -Filter "__pycache__" |
+    	Remove-Item -Recurse -Force
+
+	Get-ChildItem -Path . -File -Recurse -Filter "*.pyc" |
+    	Remove-Item -Force
+
 # --- k8s Infrastructure ---
 .PHONY: cluster-up cluster-down infra-install infra-upgrade infra-uninstall
 

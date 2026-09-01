@@ -23,7 +23,7 @@ def load_example(name: str) -> dict[str, Any]:
     Returns:
         The example data as a dictionary.
     """
-    path = Path(__file__).parent.parent.parent.parent / "examples" / "metadata" / name
+    path = Path(__file__).parent.parent.parent.parent.parent / "examples" / "metadata" / name
     with open(path) as f:
         return cast(dict[str, Any], json.load(f))
 
