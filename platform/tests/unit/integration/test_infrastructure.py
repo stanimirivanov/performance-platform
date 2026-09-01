@@ -25,7 +25,7 @@ class TestCircuitBreaker:
             cb.record_failure()
         assert cb.can_execute() is False
 
-    def test_half_open_after_timeout(self, monkeypatch):
+    def test_half_open_single_probe(self, monkeypatch):
         cb = CircuitBreaker()
         for _ in range(5):
             cb.record_failure()
@@ -34,17 +34,34 @@ class TestCircuitBreaker:
         # Simulate time passing beyond recovery_timeout
         future_time = time.monotonic() + 31.0
         monkeypatch.setattr(
-            "perfeng.integration.infrastructure.circuit_breaker.time.monotonic", lambda: future_time
+            "perfeng.integration.infrastructure.circuit_breaker.time.monotonic",
+            lambda: future_time,
         )
+        # First call transitions to half-open and allows one probe
+        assert cb.can_execute() is True
+        # Subsequent calls must be rejected while probe is in flight
+        assert cb.can_execute() is False
+        assert cb.can_execute() is False
+
+        # Probe succeeds -> circuit closes
+        cb.record_success()
         assert cb.can_execute() is True
 
-    def test_record_success_resets(self):
+    def test_half_open_failed_probe_reopens(self, monkeypatch):
         cb = CircuitBreaker()
         for _ in range(5):
             cb.record_failure()
         assert cb.can_execute() is False
-        cb.record_success()
+
+        future_time = time.monotonic() + 31.0
+        monkeypatch.setattr(
+            "perfeng.integration.infrastructure.circuit_breaker.time.monotonic",
+            lambda: future_time,
+        )
         assert cb.can_execute() is True
+        # Probe fails
+        cb.record_failure()
+        assert cb.can_execute() is False
 
 
 class TestResilientHttpClient:
