@@ -18,7 +18,7 @@ class MetadataPersistenceClient:
         base_url: str,
         client: HttpClient | None = None,
     ):
-        self._client = client  # retain for closing if provided
+        self._client = client
         self._repository = StorageRunRepository(
             base_url=base_url,
             mapper=DefaultMetadataMapper(),
@@ -30,7 +30,12 @@ class MetadataPersistenceClient:
 
     async def close(self) -> None:
         if self._client is not None:
-            await self._client.close()
+            # Use aclose if available (httpx.AsyncClient, AsyncMock), else close
+            close_method = getattr(self._client, "aclose", None)
+            if close_method is None:
+                close_method = getattr(self._client, "close", None)
+            if close_method is not None:
+                await close_method()
         else:
             await self._repository.close()
 
