@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Protocol, runtime_checkable
 
 from perfeng.generated.run_metadata import PerformanceRunMetadata
+from perfeng.integration.models import Snapshot
 from perfeng.storage.schemas import EnvironmentCreate, RunCreate
 
 
@@ -17,8 +18,8 @@ class HttpClient(Protocol):
         url: str,
         json: dict[str, Any],
         timeout: float | None = None,
-    ) -> dict[str, Any]:
-        """POST JSON payload and return parsed response."""
+    ) -> Any:  # <-- now Any; concrete impls return httpx.Response
+        """POST JSON payload and return the raw response object."""
         ...
 
     async def close(self) -> None:

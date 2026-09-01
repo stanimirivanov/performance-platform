@@ -1,5 +1,6 @@
 """Unit tests for MetadataPersistenceClient."""
 
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -21,13 +22,18 @@ from perfeng.generated.run_metadata import (
 from perfeng.integration.persistence import MetadataPersistenceClient
 
 
+def parse_dt(iso_str: str) -> datetime:
+    """Parse an ISO 8601 string (with optional Z) to an aware datetime."""
+    return datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+
+
 def make_metadata():
     return PerformanceRunMetadata(
         run=Run(
             id="perf-20240101-000000-abcdef12",
             suite="checkout-api",
             profile=Profile.regression,
-            timestamp="2024-01-01T00:00:00Z",
+            timestamp=parse_dt("2024-01-01T00:00:00Z"),
             trigger=Trigger.ci,
             status=Status.RUNNING,
             policyVersion="1.0.0",

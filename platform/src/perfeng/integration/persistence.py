@@ -18,6 +18,7 @@ class MetadataPersistenceClient:
         base_url: str,
         client: HttpClient | None = None,
     ):
+        self._client = client  # retain for closing if provided
         self._repository = StorageRunRepository(
             base_url=base_url,
             mapper=DefaultMetadataMapper(),
@@ -25,11 +26,13 @@ class MetadataPersistenceClient:
         )
 
     async def save(self, metadata: PerformanceRunMetadata) -> dict[str, Any]:
-        """Persist the metadata and return the API response JSON."""
         return await self._repository.save(metadata)
 
     async def close(self) -> None:
-        await self._repository.close()
+        if self._client is not None:
+            await self._client.close()
+        else:
+            await self._repository.close()
 
     async def __aenter__(self) -> MetadataPersistenceClient:
         return self

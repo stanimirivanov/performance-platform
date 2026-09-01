@@ -13,6 +13,7 @@ from typing import Any
 import httpx
 
 from perfeng.integration.models import CircuitBreakerConfig, RetryConfig
+from perfeng.integration.protocols import HttpClient
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +58,7 @@ class ResilientHttpClient:
     def __init__(
         self,
         base_url: str,
-        client: httpx.AsyncClient | None = None,
+        client: HttpClient | None = None,
         retry: RetryConfig | None = None,
         circuit_breaker: CircuitBreaker | None = None,
         default_timeout: float = 30.0,
@@ -144,7 +145,7 @@ class ResilientHttpClient:
 
     async def close(self) -> None:
         if self._owns_client:
-            await self._client.aclose()
+            await self.close()
 
 
 class IntervalScheduler:

@@ -24,8 +24,7 @@ class StorageRunRepository:
         retry: RetryConfig | None = None,
     ):
         self._mapper = mapper
-        self._client = http_client or ResilientHttpClient(base_url, retry=retry)
-        self._owns_client = http_client is None
+        self._client = ResilientHttpClient(base_url, client=http_client, retry=retry)
         self._logger = logging.getLogger(__name__)
 
     async def save(self, metadata: PerformanceRunMetadata) -> dict[str, Any]:
@@ -42,8 +41,7 @@ class StorageRunRepository:
         return result
 
     async def close(self) -> None:
-        if self._owns_client:
-            await self._client.close()
+        await self._client.close()
 
 
 class StorageSnapshotRepository:
@@ -55,8 +53,7 @@ class StorageSnapshotRepository:
         http_client: HttpClient | None = None,
         retry: RetryConfig | None = None,
     ):
-        self._client = http_client or ResilientHttpClient(base_url, retry=retry)
-        self._owns_client = http_client is None
+        self._client = ResilientHttpClient(base_url, client=http_client, retry=retry)
         self._logger = logging.getLogger(__name__)
 
     async def post_snapshots(self, run_id: str, snapshots: list[Snapshot]) -> None:
@@ -72,5 +69,4 @@ class StorageSnapshotRepository:
         self._logger.debug("Posted %d snapshots for run %s", len(snapshots), run_id)
 
     async def close(self) -> None:
-        if self._owns_client:
-            await self._client.close()
+        await self._client.close()
