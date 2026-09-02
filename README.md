@@ -15,6 +15,7 @@ We are going to implement a proof of concept of the above research.
 - [Local Setup Guide](docs/local-setup.md)
 - [Monitoring Stack](docs/monitoring-stack.md)
 - [Architecture](docs/architecture)
+- [Polyrepo Migration Blueprint](docs/architecture/polyrepo-migration.md)
 
 ## Helm Charts
 
