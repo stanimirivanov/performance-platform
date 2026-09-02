@@ -188,7 +188,7 @@ Storage Management
 The system is designed to be extensible:
 1. **New metric types**: Add to resource snapshots
 2. **Additional metadata**: Extend test_runs table
-3. **Custom events**: Use correlation_events with metadata JSON
+3. **Custom events**: Use correlation_events with attributes JSON
 4. **New backends**: Support different storage backends
 
 ## Deployment

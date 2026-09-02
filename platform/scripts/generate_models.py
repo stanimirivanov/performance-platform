@@ -37,9 +37,22 @@ SCHEMA_TO_MODEL: Final[dict[str, str]] = {
 }
 
 
+def add_test_false(file_path: Path) -> None:
+    """Add `__test__ = False` to any class starting with 'Test' to avoid pytest collection."""
+    content = file_path.read_text(encoding="utf-8")
+    lines = content.splitlines()
+    new_lines = []
+    for line in lines:
+        new_lines.append(line)
+        stripped = line.lstrip()
+        if stripped.startswith("class Test") and stripped.endswith(":"):
+            indent = line[: len(line) - len(stripped)]
+            new_lines.append(f"{indent}    __test__ = False")
+    file_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+
+
 def generate_models() -> None:
     """Generate Pydantic models from all JSON schemas."""
-    # Create output directory if it doesn't exist
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     for schema_file, model_file in SCHEMA_TO_MODEL.items():
@@ -68,6 +81,9 @@ def generate_models() -> None:
             collapse_root_models=False,
             formatters=[Formatter.BUILTIN],
         )
+
+        # Add __test__ = False to any Test* classes
+        add_test_false(output_path)
 
         print(f"  Generated: {output_path}")
 

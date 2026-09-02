@@ -14,7 +14,7 @@ class EventCreate(BaseModel):
     phase_name: str | None = None
     description: str | None = None
     tags: list[str] | None = None
-    metadata: dict[str, Any] | None = None
+    attributes: dict[str, Any] | None = None
     sequence_number: int | None = None
     parent_event_id: UUID | None = None
 
@@ -31,7 +31,7 @@ class EventResponse(BaseModel):
     event_time: datetime
     description: str | None = None
     tags: list[str] | None = None
-    metadata: dict[str, Any] | None = Field(default=None, validation_alias="metadata_")
+    attributes: dict[str, Any] | None
     sequence_number: int | None = None
     parent_event_id: UUID | None = None
 

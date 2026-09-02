@@ -22,7 +22,7 @@ class SnapshotCreate(BaseModel):
     unit: str | None = None
     test_phase: str | None = None
     time_elapsed_seconds: int | None = None
-    metadata: dict[str, Any] | None = None
+    attributes: dict[str, Any] | None = None
 
 
 class SnapshotResponse(BaseModel):
@@ -45,7 +45,7 @@ class SnapshotResponse(BaseModel):
     snapshot_time: datetime
     test_phase: str | None = None
     time_elapsed_seconds: int | None = None
-    metadata: dict[str, Any] | None = Field(default=None, validation_alias="metadata_")
+    attributes: dict[str, Any] | None
 
 
 class SnapshotFilter(BaseModel):

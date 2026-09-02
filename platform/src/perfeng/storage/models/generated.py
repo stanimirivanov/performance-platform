@@ -121,7 +121,7 @@ class CorrelationEvents(Base):
     phase_name: Mapped[Optional[TestPhase]] = mapped_column(Enum(TestPhase, values_callable=lambda cls: [member.value for member in cls], name='test_phase', schema='metadata'))
     description: Mapped[Optional[str]] = mapped_column(Text)
     tags: Mapped[Optional[list[str]]] = mapped_column(ARRAY(Text()))
-    metadata_: Mapped[Optional[dict]] = mapped_column('metadata', JSONB)
+    attributes: Mapped[Optional[dict]] = mapped_column(JSONB)
     sequence_number: Mapped[Optional[int]] = mapped_column(Integer)
     parent_event_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid)
 
@@ -215,6 +215,6 @@ class ResourceSnapshots(Base):
     unit: Mapped[Optional[str]] = mapped_column(Text)
     test_phase: Mapped[Optional[TestPhase]] = mapped_column(Enum(TestPhase, values_callable=lambda cls: [member.value for member in cls], name='test_phase', schema='metadata'))
     time_elapsed_seconds: Mapped[Optional[int]] = mapped_column(Integer)
-    metadata_: Mapped[Optional[dict]] = mapped_column('metadata', JSONB)
+    attributes: Mapped[Optional[dict]] = mapped_column(JSONB)
 
     run: Mapped['TestRuns'] = relationship('TestRuns', back_populates='resource_snapshots')

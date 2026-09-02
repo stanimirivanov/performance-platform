@@ -14,9 +14,8 @@ CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
 class BaseRepository(Generic[ModelType, CreateSchemaType]):
     """Base repository implementing common CRUD operations.
 
-    The repository is **stateless**,  it does not store an AsyncSession.
-    All methods that need database access require an explicit 'session'
-    parameter. This makes the repository thread‑safe and request‑scoped.
+    Repositories are stateless: they do not hold an AsyncSession.
+    All methods that need database access require an explicit `session` parameter.
     """
 
     def __init__(self, model: type[ModelType]):
@@ -28,7 +27,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType]):
         if len(mapper.primary_key) != 1:
             raise ValueError("Repository supports only models with a single primary key column")
         self.pk_column = mapper.primary_key[0]
-        self.column_names = set(mapper.columns.keys())  # <-- store valid column names
+        self.column_names = set(mapper.columns.keys())
 
     @staticmethod
     def apply_filters(query: Select, *conditions: ColumnElement[bool] | None) -> Select:
@@ -49,11 +48,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType]):
         await session.flush()
         return instance
 
-    async def get(
-        self,
-        session: AsyncSession,
-        id: UUID,
-    ) -> ModelType | None:
+    async def get(self, session: AsyncSession, id: UUID) -> ModelType | None:
         """Get a record by primary key."""
         result = await session.execute(select(self.model).where(self.pk_column == id))
         return result.scalar_one_or_none()
@@ -77,11 +72,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType]):
         result = await session.execute(query)
         return list(result.scalars().all())
 
-    async def delete(
-        self,
-        session: AsyncSession,
-        id: UUID,
-    ) -> bool:
+    async def delete(self, session: AsyncSession, id: UUID) -> bool:
         """Delete a record by primary key."""
         instance = await self.get(session, id)
         if not instance:
