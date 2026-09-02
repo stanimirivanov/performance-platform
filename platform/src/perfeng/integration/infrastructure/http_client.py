@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from typing import Any
 
 import httpx
@@ -16,6 +17,7 @@ from tenacity import (
 from perfeng.integration.infrastructure.circuit_breaker import CircuitBreaker
 from perfeng.integration.infrastructure.exceptions import RetryableRequestError
 from perfeng.integration.models import RetryConfig
+from perfeng.integration.protocols import HttpClient, HttpResponse
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +28,7 @@ class ResilientHttpClient:
     def __init__(
         self,
         base_url: str,
-        client: httpx.AsyncClient | None = None,
+        client: HttpClient | None = None,
         retry: RetryConfig | None = None,
         circuit_breaker: CircuitBreaker | None = None,
         default_timeout: float = 30.0,
@@ -40,9 +42,10 @@ class ResilientHttpClient:
     async def post(
         self,
         url: str,
-        json: dict[str, Any],
+        *,
+        json: Mapping[str, Any],
         timeout: float | None = None,
-    ) -> dict[str, Any]:
+    ) -> HttpResponse:
         if not self._circuit.can_execute():
             raise RuntimeError("Circuit breaker is OPEN")
 
@@ -71,7 +74,7 @@ class ResilientHttpClient:
 
                         response.raise_for_status()
                         self._circuit.record_success()
-                        return response.json()
+                        return response
 
                     except httpx.RequestError as exc:
                         self._circuit.record_failure()

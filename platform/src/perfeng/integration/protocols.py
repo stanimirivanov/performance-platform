@@ -2,37 +2,55 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any, Protocol, runtime_checkable
 
 from perfeng.generated.run_metadata import PerformanceRunMetadata
 from perfeng.integration.models import Snapshot
 from perfeng.storage.schemas import EnvironmentCreate, RunCreate
 
+"""Abstract contracts for the integration layer."""
+
+
+@runtime_checkable
+class HttpResponse(Protocol):
+    """Minimal HTTP response abstraction."""
+
+    status_code: int
+
+    def raise_for_status(self) -> None: ...
+    def json(self) -> dict[str, Any]: ...
+
 
 @runtime_checkable
 class HttpClient(Protocol):
-    """Async HTTP client abstraction.
-
-    Implementations must support use as an async context manager,
-    which is the standard lifecycle pattern for async resources.
-    """
+    """Async HTTP client abstraction."""
 
     async def post(
         self,
         url: str,
-        json: dict[str, Any],
+        *,
+        json: Mapping[str, Any],
         timeout: float | None = None,
-    ) -> Any:
+    ) -> HttpResponse:
         """POST JSON payload and return the raw response object."""
+        ...
+
+    async def aclose(self) -> None:
+        """Close the client and release resources."""
         ...
 
     async def __aenter__(self) -> HttpClient:
         """Enter the async context manager."""
         ...
 
-    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    async def __aexit__(
+        self,
+        exc_type: Any,
+        exc_val: Any,
+        exc_tb: Any,
+    ) -> None:
         """Exit the async context manager, releasing resources."""
-        ...
 
 
 @runtime_checkable
